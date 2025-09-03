@@ -1,0 +1,259 @@
+/* Styles for Terra Time Calculator Extension */
+
+/* Nút phân tích được inject vào trang */
+.terra-analyze-button {
+    position: fixed !important;
+    top: 20px !important;
+    right: 20px !important;
+    z-index: 999999 !important;
+    background: linear-gradient(135deg, #4CAF50, #45a049) !important;
+    color: white !important;
+    border: none !important;
+    padding: 12px 18px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3) !important;
+    transition: all 0.3s ease !important;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+}
+
+.terra-analyze-button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4) !important;
+    background: linear-gradient(135deg, #45a049, #3d8b40) !important;
+}
+
+.terra-analyze-button:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3) !important;
+}
+
+/* Modal overlay */
+.terra-modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.6) !important;
+    z-index: 1000000 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    backdrop-filter: blur(3px) !important;
+}
+
+/* Modal content */
+.terra-modal-content {
+    background: white !important;
+    padding: 30px !important;
+    border-radius: 16px !important;
+    max-width: 600px !important;
+    width: 90% !important;
+    max-height: 80% !important;
+    overflow-y: auto !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15) !important;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+    position: relative !important;
+}
+
+.terra-modal-header {
+    margin-bottom: 25px !important;
+    text-align: center !important;
+}
+
+.terra-modal-header h2 {
+    margin: 0 !important;
+    color: #333 !important;
+    font-size: 24px !important;
+    font-weight: 700 !important;
+}
+
+.terra-modal-header p {
+    margin: 8px 0 0 0 !important;
+    color: #666 !important;
+    font-size: 14px !important;
+}
+
+/* Thông tin thống kê */
+.terra-stats-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+    gap: 15px !important;
+    margin-bottom: 25px !important;
+}
+
+.terra-stat-card {
+    background: #f8f9fa !important;
+    padding: 20px !important;
+    border-radius: 12px !important;
+    text-align: center !important;
+    border: 1px solid #e9ecef !important;
+}
+
+.terra-stat-card h3 {
+    margin: 0 0 8px 0 !important;
+    font-size: 14px !important;
+    color: #666 !important;
+    font-weight: 500 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+.terra-stat-card .value {
+    font-size: 24px !important;
+    font-weight: 700 !important;
+    color: #333 !important;
+    margin: 0 !important;
+}
+
+.terra-stat-card.shortage {
+    background: linear-gradient(135deg, #ffebee, #ffcdd2) !important;
+    border-color: #ef5350 !important;
+}
+
+.terra-stat-card.shortage .value {
+    color: #d32f2f !important;
+}
+
+.terra-stat-card.complete {
+    background: linear-gradient(135deg, #e8f5e8, #c8e6c9) !important;
+    border-color: #66bb6a !important;
+}
+
+.terra-stat-card.complete .value {
+    color: #2e7d32 !important;
+}
+
+/* Nút hành động */
+.terra-actions {
+    display: flex !important;
+    gap: 12px !important;
+    justify-content: flex-end !important;
+    margin-top: 25px !important;
+    padding-top: 20px !important;
+    border-top: 1px solid #e9ecef !important;
+}
+
+.terra-btn {
+    padding: 10px 20px !important;
+    border: none !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+}
+
+.terra-btn-primary {
+    background: linear-gradient(135deg, #2196F3, #1976D2) !important;
+    color: white !important;
+}
+
+.terra-btn-primary:hover {
+    background: linear-gradient(135deg, #1976D2, #1565C0) !important;
+    transform: translateY(-1px) !important;
+}
+
+.terra-btn-secondary {
+    background: #6c757d !important;
+    color: white !important;
+}
+
+.terra-btn-secondary:hover {
+    background: #5a6268 !important;
+    transform: translateY(-1px) !important;
+}
+
+.terra-btn-danger {
+    background: #dc3545 !important;
+    color: white !important;
+}
+
+.terra-btn-danger:hover {
+    background: #c82333 !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Bảng chi tiết */
+.terra-detail-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 20px 0 !important;
+    font-size: 13px !important;
+}
+
+.terra-detail-table th,
+.terra-detail-table td {
+    padding: 8px 12px !important;
+    text-align: left !important;
+    border-bottom: 1px solid #e9ecef !important;
+}
+
+.terra-detail-table th {
+    background: #f8f9fa !important;
+    font-weight: 600 !important;
+    color: #495057 !important;
+}
+
+.terra-detail-table tr:hover {
+    background: #f8f9fa !important;
+}
+
+/* Loading spinner */
+.terra-loading {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 40px !important;
+    color: #666 !important;
+}
+
+.terra-spinner {
+    width: 20px !important;
+    height: 20px !important;
+    border: 2px solid #e9ecef !important;
+    border-top: 2px solid #007bff !important;
+    border-radius: 50% !important;
+    animation: terra-spin 1s linear infinite !important;
+    margin-right: 12px !important;
+}
+
+@keyframes terra-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .terra-modal-content {
+        margin: 20px !important;
+        padding: 20px !important;
+        width: calc(100% - 40px) !important;
+    }
+    
+    .terra-stats-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .terra-actions {
+        flex-direction: column !important;
+    }
+    
+    .terra-btn {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+}
+
+/* Đảm bảo không bị ảnh hưởng bởi CSS của trang */
+.terra-analyze-button,
+.terra-modal-overlay,
+.terra-modal-content,
+.terra-modal-content * {
+    box-sizing: border-box !important;
+    line-height: normal !important;
+}

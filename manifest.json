@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Terra Time Calculator",
+  "version": "1.0.0",
+  "description": "Tính toán thời gian làm việc còn thiếu trên hệ thống Terra",
+  
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Terra Time Calculator"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
