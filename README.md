@@ -7,7 +7,21 @@
 - ✅ Phân tích bảng chấm công Terra tự động
 - ⏱️ Tính toán thời gian làm việc dự kiến vs thực tế
 - 📊 Hiển thị thông tin thống kê chi tiết
-- 🎯 Giao diện thân thiện và dễ sử dụng
+- 🔧 Logic tính toán thông minh theo quy tắc Terra chính xác
+- 🌟 Hỗ trợ nghỉ nửa ngày và các trường hợp đặc biệt
+
+## ✨ Tính năng nổi bật
+
+### 🧠 Logic tính toán thông minh
+- **Hybrid Logic:** Kết hợp Dynamic và Fixed để tính chính xác
+- **Penalty vào sớm:** Tự động phát hiện vào trước 7:30 và cộng penalty 30p
+- **Overtime thông minh:** Chỉ tính thừa giờ >= 30p, làm tròn xuống 15p
+- **Phân biệt ca:** Tự động nhận diện ca toàn thời gian vs ca chiều
+
+### 🎯 Hỗ trợ đa dạng
+- **Nghỉ nửa ngày:** Tự động phát hiện và tính toán chính xác
+- **Tìm bảng thông minh:** Nhiều pattern nhận diện bảng Terra
+- **Giao diện responsive:** Hoạt động mượt mà trên popup nhỏ
 
 ## 🚀 Cài đặt
 
@@ -15,8 +29,8 @@
 
 1. **Tải source code:**
    ```bash
-   git clone https://github.com/yourusername/terra-time-calculator.git
-   cd terra-time-calculator
+   git clone https://github.com/bqhai199x/terra_tool.git
+   cd terra_tool
    ```
 
 2. **Cài đặt vào Chrome:**
@@ -25,27 +39,15 @@
    - Click **"Load unpacked"** và chọn thư mục source code
    - Extension sẽ được cài đặt và hiển thị icon trên thanh công cụ
 
-### Cách 2: Từ file build (Recommended)
+### Cách 2: Cài đặt từ GitHub Releases
 
-1. **Tải file build:**
-   - Tải file `terra-time-calculator.zip` từ thư mục `build/`
-   - Hoặc chạy script build: `.\build-extension.ps1`
+1. **Tải extension:**
+   - Truy cập [GitHub Releases](https://github.com/bqhai199x/terra_tool/releases)
+   - Tải file `.zip` phiên bản mới nhất
+   - Giải nén file
 
 2. **Cài đặt:**
-   - Xem hướng dẫn chi tiết trong file `build/INSTALL.md`
-   - Hoặc làm theo hướng dẫn Cách 1 ở trên
-
-### 🔨 Build từ source
-
-Để build extension thành file package:
-
-```powershell
-# Chạy script build
-.\build-extension.ps1
-
-# File output: build/terra-time-calculator.zip
-# Kèm theo: build/INSTALL.md (hướng dẫn cài đặt)
-```
+   - Làm theo hướng dẫn Cách 1 ở trên để load unpacked extension
 
 ## 📖 Hướng dẫn sử dụng
 
@@ -56,20 +58,17 @@
 
 ### Bước 2: Sử dụng Extension
 
-#### Cách 1: Sử dụng nút trên trang
-1. Khi ở trang Terra, sẽ xuất hiện nút **"📊 Tính thời gian còn thiếu"** ở góc trên phải
-2. Click vào nút để phân tích bảng
-
-#### Cách 2: Sử dụng popup extension
+**Chỉ sử dụng popup extension:**
 1. Click vào icon extension trên thanh công cụ Chrome
-2. Click nút **"📊 Phân tích"** trong popup
-3. Xem kết quả hiển thị
+2. Extension sẽ tự động kiểm tra xem có bảng Terra trên trang hiện tại không
+3. Nếu tìm thấy bảng: Click nút **"📊 Phân tích"** 
+4. Nếu chưa tìm thấy bảng: Click nút **"🔍 Quét lại"** để tìm kiếm lại
 
 ### Bước 3: Xem kết quả
-- **Số ngày làm việc:** Tổng số ngày đã làm việc
-- **Giờ dự kiến:** Tổng số giờ theo kế hoạch
-- **Giờ thực tế:** Tổng số giờ đã làm việc thực tế
-- **Thời gian còn thiếu:** Số giờ cần bù thêm (nếu có)
+- **Số ngày làm việc:** Tổng số ngày đã làm việc (bao gồm nghỉ nửa ngày)
+- **Phút thiếu:** Tổng số phút thiếu do vào muộn, ra sớm, vào quá sớm
+- **Phút thừa:** Tổng số phút thừa do làm overtime (chỉ tính từ 30p trở lên)
+- **Kết quả:** Thời gian cần bù thêm hoặc đã đủ/thừa
 
 ### Bước 4: Xem chi tiết
 - Click **"📋 Xem chi tiết"** để xem bảng phân tích chi tiết
@@ -78,17 +77,18 @@
 ## 🔧 Cấu trúc dự án
 
 ```
-terra-time-calculator/
+terra_tool/
 ├── manifest.json           # Cấu hình Chrome Extension
 ├── content.js             # Script phân tích trang Terra
 ├── popup.html             # Giao diện popup
 ├── popup.js               # Logic popup
 ├── styles.css             # CSS cho extension
+├── CALCULATION_RULES.md   # Quy tắc tính toán chi tiết
 ├── icons/                 # Thư mục chứa icon
-│   ├── icon16.png
-│   ├── icon32.png
-│   ├── icon48.png
-│   └── icon128.png
+│   ├── icon16.png/svg
+│   ├── icon32.png/svg
+│   ├── icon48.png/svg
+│   └── icon128.png/svg
 └── README.md              # Tài liệu này
 ```
 
@@ -102,71 +102,21 @@ terra-time-calculator/
 - **Manifest V3** - Chrome Extension API mới nhất
 - **Vanilla JavaScript** - Không phụ thuộc framework
 - **CSS3** - Styling hiện đại
-- **Chrome APIs:** tabs, storage, scripting
+- **Chrome APIs:** tabs, scripting
+- **Logic tính toán:** Hybrid Dynamic + Fixed theo quy tắc Terra
+
+### Quy tắc tính toán
+Extension sử dụng logic phức tạp để tính chính xác theo quy định Terra:
+- **Thiếu giờ:** Vào muộn sau 8:30, penalty 30p nếu vào trước 7:30
+- **Thừa giờ:** Làm sau 17:30 (ca toàn) hoặc 17:00 (ca chiều), chỉ tính từ 30p, làm tròn xuống 15p
+- **Logic Hybrid:** Dynamic cho vào sớm (được thưởng), Fixed cho vào muộn (bị phạt)
+- **Hỗ trợ nghỉ nửa ngày:** Tự động phát hiện và tính toán chính xác
+
+Chi tiết xem file [CALCULATION_RULES.md](CALCULATION_RULES.md)
 
 ### Cấu trúc HTML bảng Terra được hỗ trợ
-Extension tự động nhận diện bảng có cấu trúc:
-```html
-<table class="el-table__header">
-  <thead>
-    <tr>
-      <th>Ngày</th>
-      <th>Phân loại</th>
-      <th colspan="2">Dự kiến</th>
-      <th colspan="2">Thực tế</th>
-      <th>Giờ làm</th>
-      <th>Tăng ca</th>
-    </tr>
-    <tr>
-      <th>Vào</th>
-      <th>Ra</th>
-      <th>Vào</th>
-      <th>Ra</th>
-    </tr>
-  </thead>
-</table>
-```
-
-## 🐛 Báo lỗi và góp ý
-
-Nếu bạn gặp lỗi hoặc có ý tưởng cải thiện:
-
-1. **Tạo Issue** trên GitHub repository
-2. **Mô tả chi tiết:**
-   - Bước tái tạo lỗi
-   - Ảnh chụp màn hình (nếu có)
-   - Phiên bản Chrome
-   - URL trang Terra (nếu được phép)
-
-## 📝 Changelog
-
-### v1.0.0 (2025-08-29)
-- ✨ Phiên bản đầu tiên
-- 🔍 Tự động nhận diện bảng Terra
-- 📊 Tính toán thời gian làm việc
-- 🎨 Giao diện popup đẹp mắt
-
-## 🔐 Bảo mật và Quyền riêng tư
-
-- Extension chỉ hoạt động trên trang web bạn đang truy cập
-- Không thu thập dữ liệu cá nhân
-- Không gửi thông tin về server bên ngoài
-- Dữ liệu chỉ được xử lý cục bộ trên trình duyệt
-
-## 📄 Giấy phép
-
-MIT License - Xem file [LICENSE](LICENSE) để biết chi tiết.
-
-## 🤝 Đóng góp
-
-Mọi đóng góp đều được hoan nghênh! Vui lòng:
-
-1. Fork repository
-2. Tạo feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
-5. Tạo Pull Request
-
----
-
-**Được phát triển với ❤️ cho cộng đồng Terra**
+Extension tự động nhận diện bảng Terra với nhiều pattern khác nhau:
+- Tìm bảng có header chứa "Ngày", "Phân loại", "Dự kiến", "Thực tế"
+- Hỗ trợ các class `.el-table`, `table`
+- Tự động xử lý dữ liệu từ cả text và input fields
+- Phát hiện nghỉ nửa ngày (ô ngày trống + phân loại "đi làm")
