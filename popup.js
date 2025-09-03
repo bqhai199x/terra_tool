@@ -91,9 +91,6 @@ class TerraPopup {
             </div>
             
             <div class="buttons">
-                <button class="btn-primary" id="analyzeBtn">
-                    📊 Phân tích
-                </button>
                 <button class="btn-secondary" id="refreshBtn">
                     🔄 Làm mới
                 </button>
@@ -101,6 +98,9 @@ class TerraPopup {
             
             <div id="results" style="margin-top: 15px;"></div>
         `;
+        
+        // Tự động phân tích sau khi tìm thấy bảng
+        this.analyzeTimesheet();
     }
 
     showNotTerraPage() {
