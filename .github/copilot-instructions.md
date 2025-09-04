@@ -17,10 +17,8 @@ Dự án Chrome extension hoàn chỉnh để tính toán thời gian làm việ
 - [x] Viết logic tính toán thời gian (hybrid system)
 - [x] Tạo file README.md với hướng dẫn chi tiết
 - [x] **HOÀN THÀNH:** Sửa logic tinhThoiGianLamThucTe để hỗ trợ đầy đủ 3 loại ca
-- [x] **HOÀN THÀNH:** Kiểm tra và sửa tất cả ví dụ trong CALCULATION_RULES.md (7/7 pass)
 - [x] **HOÀN THÀNH:** Xác nhận logic hybrid - flexible time (không penalty vào sớm)
 - [x] **HOÀN THÀNH:** Tạo icon set hoàn chỉnh cho extension (16px, 32px, 48px, 128px)
-- [x] **HOÀN THÀNH:** Comprehensive testing với Node.js verification scripts
 
 ## Tiến trình còn lại
 - [ ] Test extension trên trang Terra thực tế
@@ -35,7 +33,6 @@ Dự án Chrome extension hoàn chỉnh để tính toán thời gian làm việ
    - **Hybrid Logic System:** Kết hợp flexible time (7:30-8:30) và penalty rules
    - **3-Shift Support:** Ca sáng (4h), Ca chiều (4h), Ca toàn thời gian (8h + nghỉ trưa)
    - **Smart Detection:** Tự động nhận diện bảng Terra và phân loại ca làm việc
-   - **Accurate Calculation:** Logic `tinhThoiGianLamThucTe()` đã verified với 100% test cases
    - **Modern UI:** Modal với animation, responsive design, detailed breakdown
 3. **popup.html/js** - Extension popup interface:
    - **Terra Page Detection:** Kiểm tra trang hiện tại có phải Terra không
@@ -55,15 +52,10 @@ Dự án Chrome extension hoàn chỉnh để tính toán thời gian làm việ
    - **Troubleshooting:** Common issues và solutions
 6. **CALCULATION_RULES.md** - Technical specification:
    - **Hybrid Logic Documentation:** Chi tiết quy tắc flexible time + penalty
-   - **Real Examples:** 7 test cases đã verified (100% accuracy)
    - **Code Samples:** JavaScript functions với explanation
-7. **Test Suite** - Node.js verification scripts:
-   - **final_verification.js:** Comprehensive test cho tất cả ví dụ documentation
-   - **debug_*.js:** Specific test cases để verify edge cases
-   - **100% Pass Rate:** Tất cả logic đã được kiểm tra kỹ lưỡng
 
 ### Visual Assets
-8. **icons/** - Complete icon set:
+7. **icons/** - Complete icon set:
    - **Multi-resolution:** 16px, 32px, 48px, 128px (PNG + SVG)
    - **Professional Design:** Clean, recognizable Terra-themed icons
    - **Chrome Standards:** Đúng format và kích thước yêu cầu
@@ -100,6 +92,5 @@ Dự án Chrome extension hoàn chỉnh để tính toán thời gian làm việ
 
 ### Development Status
 - **Production Ready:** Core logic 100% verified, UI/UX hoàn thiện
-- **Extensively Tested:** 7/7 test cases pass, edge cases covered
 - **Well Documented:** Complete technical documentation và user guide
 - **Future Proof:** Codebase clean, maintainable, easy to extend

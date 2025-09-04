@@ -364,3 +364,13 @@
 .terra-value-surplus {
     color: #2e7d32 !important;
 }
+
+/* Text decoration utilities */
+.terra-text-underline {
+    text-decoration: underline !important;
+}
+
+/* Small text styling */
+.terra-text-small {
+    font-size: 12px !important;
+}

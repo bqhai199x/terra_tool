@@ -1,4 +1,34 @@
 // Content script để phân tích bảng chấm công Terra
+
+// Constants for shift types and time calculations
+const SHIFT_TYPES = {
+    MORNING: 'Sáng',
+    AFTERNOON: 'Chiều', 
+    FULL_DAY: 'Đầy đủ'
+};
+
+const TIME_CONSTANTS = {
+    WORK_HOURS: {
+        HALF_DAY: 4 * 60,    // 4 hours in minutes
+        FULL_DAY: 8 * 60,    // 8 hours in minutes
+        LUNCH_BREAK: 60      // 1 hour lunch break
+    },
+    FLEXIBLE_RANGES: {
+        FULL_DAY: { start: 7 * 60 + 30, end: 8 * 60 + 30 },     // 07:30-08:30
+        MORNING: { start: 7 * 60 + 30, end: 8 * 60 },           // 07:30-08:00
+        AFTERNOON: { start: 13 * 60, end: 13 * 60 + 30 }        // 13:00-13:30
+    },
+    STANDARD_TIMES: {
+        MORNING_END: 12 * 60,      // 12:00
+        AFTERNOON_START: 13 * 60,   // 13:00
+        FIXED_END_TIME: 17 * 60 + 30 // 17:30
+    },
+    OVERTIME: {
+        MIN_MINUTES: 30,    // Minimum 30 minutes to count
+        ROUND_INTERVAL: 15  // Round down to 15-minute intervals
+    }
+};
+
 class TerraTimeAnalyzer {
     constructor() {
         this.tableData = [];
@@ -13,59 +43,124 @@ class TerraTimeAnalyzer {
 
     setupMessageListener() {
         chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+            this.handleMessage(request, sendResponse);
+            return true; // Keep message channel open for async responses
+        });
+    }
+
+    async handleMessage(request, sendResponse) {
+        try {
             switch (request.action) {
                 case 'checkTerraTable':
-                    // Tìm kiếm lại bảng khi được yêu cầu
-                    const found = this.findTerraTable();
-                    const data = found ? this.getTableInfo() : null;
-                    sendResponse({ found, data });
+                    await this.handleCheckTable(sendResponse);
                     break;
-
                 case 'analyzeTable':
-                    // Tìm lại bảng trước khi phân tích
-                    if (!this.terraTable) {
-                        this.findTerraTable();
-                    }
-
-                    this.performAnalysis().then(result => {
-                        sendResponse(result);
-                    }).catch(error => {
-                        sendResponse({ success: false, error: error.message });
-                    });
-                    return true; // Giữ kênh message mở cho async response
-
-
-
+                    await this.handleAnalyzeTable(sendResponse);
+                    break;
                 case 'showDetails':
-                    // Sửa lỗi: truyền đúng dữ liệu analysis 
-                    if (this.tableData && this.tableData.length > 0) {
-                        const analysis = this.calculateTime(this.tableData);
-                        this.showDetailedResults(analysis);
-                        sendResponse({ success: true });
-                    } else {
-                        // Nếu chưa có dữ liệu, phân tích lại
-                        this.performAnalysis().then(result => {
-                            if (result.success) {
-                                this.showDetailedResults(result.analysis);
-                                sendResponse({ success: true });
-                            } else {
-                                sendResponse({ success: false, error: 'Không có dữ liệu để hiển thị chi tiết' });
-                            }
-                        });
-                        return true; // Async response
-                    }
+                    await this.handleShowDetails(sendResponse);
                     break;
-
                 case 'rescanPage':
-                    // Tính năng: quét lại trang để tìm bảng
-                    console.log('🔄 Đang quét lại trang...');
-                    this.terraTable = null; // Reset
-                    this.tableData = []; // Reset data
-                    const foundTable = this.findTerraTable();
-                    sendResponse({ found: foundTable, message: foundTable ? 'Đã tìm thấy bảng!' : 'Vẫn không tìm thấy bảng' });
+                    await this.handleRescanPage(sendResponse);
                     break;
+                default:
+                    sendResponse({ success: false, error: 'Unknown action' });
             }
+        } catch (error) {
+            sendResponse({ success: false, error: error.message });
+        }
+    }
+
+    async handleCheckTable(sendResponse) {
+        const found = this.findTerraTable();
+        const data = found ? this.getTableInfo() : null;
+        sendResponse({ found, data });
+    }
+
+    async handleAnalyzeTable(sendResponse) {
+        if (!this.terraTable) {
+            this.findTerraTable();
+        }
+
+        const result = await this.performAnalysis();
+        sendResponse(result);
+    }
+
+    async handleShowDetails(sendResponse) {
+        if (this.tableData && this.tableData.length > 0) {
+            const analysis = this.calculateTime(this.tableData);
+            this.showDetailedResults(analysis);
+            sendResponse({ success: true });
+        } else {
+            const result = await this.performAnalysis();
+            if (result.success) {
+                this.showDetailedResults(result.analysis);
+                sendResponse({ success: true });
+            } else {
+                sendResponse({ success: false, error: 'Không có dữ liệu để hiển thị chi tiết' });
+            }
+        }
+    }
+
+    async handleRescanPage(sendResponse) {
+        console.log('🔄 Đang quét lại trang...');
+        this.reset();
+        const foundTable = this.findTerraTable();
+        sendResponse({ 
+            found: foundTable, 
+            message: foundTable ? 'Đã tìm thấy bảng!' : 'Vẫn không tìm thấy bảng' 
         });
+    }
+
+    reset() {
+        this.terraTable = null;
+        this.tableData = [];
+    }
+
+    // === TIME UTILITY METHODS ===
+    timeToMinutes(timeStr) {
+        // Chuyển đổi thời gian thành phút từ 00:00
+        const parts = timeStr.split(':');
+        const hours = parseInt(parts[0]) || 0;
+        const minutes = parseInt(parts[1]) || 0;
+        return hours * 60 + minutes;
+    }
+
+    minutesToTime(minutes) {
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    }
+
+    determineShiftType(timeIn, timeOut) {
+        const midDay = TIME_CONSTANTS.STANDARD_TIMES.MORNING_END;
+        const afternoonStart = TIME_CONSTANTS.STANDARD_TIMES.AFTERNOON_START;
+
+        if (timeIn < afternoonStart && timeOut < afternoonStart) {
+            return SHIFT_TYPES.MORNING;
+        } else if (timeIn > midDay) {
+            return SHIFT_TYPES.AFTERNOON;
+        } else {
+            return SHIFT_TYPES.FULL_DAY;
+        }
+    }
+
+    getFlexibleRange(shiftType) {
+        switch (shiftType) {
+            case SHIFT_TYPES.MORNING:
+                return TIME_CONSTANTS.FLEXIBLE_RANGES.MORNING;
+            case SHIFT_TYPES.AFTERNOON:
+                return TIME_CONSTANTS.FLEXIBLE_RANGES.AFTERNOON;
+            case SHIFT_TYPES.FULL_DAY:
+            default:
+                return TIME_CONSTANTS.FLEXIBLE_RANGES.FULL_DAY;
+        }
+    }
+
+    getRequiredWorkHours(shiftType) {
+        return shiftType === SHIFT_TYPES.FULL_DAY 
+            ? TIME_CONSTANTS.WORK_HOURS.FULL_DAY 
+            : TIME_CONSTANTS.WORK_HOURS.HALF_DAY;
     }
 
     getTableInfo() {
@@ -102,29 +197,49 @@ class TerraTimeAnalyzer {
         }
     }
 
+    // === TABLE DETECTION AND DATA EXTRACTION ===
     findTerraTable() {
         console.log('🔍 Đang tìm kiếm bảng Terra...');
+        
+        const detectors = [
+            this.detectByHeaders.bind(this),
+            this.detectByClassName.bind(this),
+            this.detectByContent.bind(this)
+        ];
 
-        // Tìm bảng có header chứa "Ngày", "Phân loại", "Dự kiến", "Thực tế"
-        const tables = document.querySelectorAll('table');
-
-        for (let table of tables) {
-            const headers = table.querySelectorAll('th .cell, th');
-            const headerTexts = Array.from(headers).map(h => h.textContent.trim());
-
-            // Kiểm tra các pattern khác nhau cho bảng Terra
-            const hasNgay = headerTexts.some(text => text.includes('Ngày') || text.includes('Date'));
-            const hasPhanLoai = headerTexts.some(text => text.includes('Phân loại') || text.includes('Type'));
-            const hasDuKien = headerTexts.some(text => text.includes('Dự kiến') || text.includes('Expected') || text.includes('Plan'));
-            const hasThucTe = headerTexts.some(text => text.includes('Thực tế') || text.includes('Actual'));
-
-            if (hasNgay && (hasPhanLoai || hasDuKien || hasThucTe)) {
-                this.terraTable = table;
+        for (const detector of detectors) {
+            if (detector()) {
+                console.log('✅ Đã tìm thấy bảng Terra');
                 return true;
             }
         }
 
-        // Nếu không tìm thấy, thử tìm theo class name
+        console.log('❌ Không tìm thấy bảng Terra');
+        return false;
+    }
+
+    detectByHeaders() {
+        const tables = document.querySelectorAll('table');
+        const requiredHeaders = ['Ngày', 'Date', 'Phân loại', 'Type', 'Dự kiến', 'Expected', 'Plan', 'Thực tế', 'Actual'];
+
+        for (let table of tables) {
+            const headers = table.querySelectorAll('th .cell, th');
+            const headerTexts = Array.from(headers).map(h => h.textContent.trim().toLowerCase());
+            
+            const matchCount = requiredHeaders.filter(required => 
+                headerTexts.some(header => header.includes(required.toLowerCase()))
+            ).length;
+
+            // Cần ít nhất 2 headers khớp để xác định đây là bảng Terra
+            if (matchCount >= 2) {
+                this.terraTable = table;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    detectByClassName() {
         const elTables = document.querySelectorAll('.el-table, [class*="table"]');
         console.log(`Tìm kiếm theo class: ${elTables.length} bảng`);
 
@@ -135,8 +250,21 @@ class TerraTimeAnalyzer {
                 return true;
             }
         }
+        return false;
+    }
 
-        console.log('❌ Không tìm thấy bảng Terra');
+    detectByContent() {
+        // Fallback: tìm bảng có chứa từ khóa liên quan đến chấm công
+        const tables = document.querySelectorAll('table');
+        const keywords = ['chấm công', 'time', 'attendance', 'giờ làm', 'work'];
+
+        for (let table of tables) {
+            const text = table.textContent.toLowerCase();
+            if (keywords.some(keyword => text.includes(keyword))) {
+                this.terraTable = table;
+                return true;
+            }
+        }
         return false;
     }
 
@@ -151,40 +279,47 @@ class TerraTimeAnalyzer {
             return [];
         }
 
-        // Thử các cách tìm tbody khác nhau
-        let tbody = null;
-
-        // Cách 1: Tìm tbody trong el-table
-        tbody = this.terraTable.closest('.el-table')?.querySelector('.el-table__body tbody');
-
-        // Cách 2: Tìm tbody trực tiếp trong table
-        if (!tbody) {
-            tbody = this.terraTable.querySelector('tbody');
-        }
-
-        // Cách 3: Tìm tất cả tr có data (không phải header)
-        if (!tbody) {
-            const allRows = this.terraTable.querySelectorAll('tr');
-
-            // Lọc ra những hàng không phải header
-            const dataRows = Array.from(allRows).filter(row => {
-                const cells = row.querySelectorAll('td');
-                return cells.length > 0; // Hàng có td (không chỉ th)
-            });
-
-            if (dataRows.length > 0) {
-                return this.processDataRows(dataRows);
-            }
-        }
-
+        const tbody = this.findTableBody();
         if (!tbody) {
             console.log('❌ Không tìm thấy tbody hoặc dữ liệu');
             return [];
         }
 
-        const rows = tbody.querySelectorAll('tr');
+        const rows = this.getDataRows(tbody);
+        return this.processDataRows(rows);
+    }
 
-        return this.processDataRows(Array.from(rows));
+    findTableBody() {
+        // Strategy pattern for finding tbody
+        const strategies = [
+            () => this.terraTable.closest('.el-table')?.querySelector('.el-table__body tbody'),
+            () => this.terraTable.querySelector('tbody'),
+            () => this.getRowsDirectly()
+        ];
+
+        for (const strategy of strategies) {
+            const result = strategy();
+            if (result) return result;
+        }
+
+        return null;
+    }
+
+    getRowsDirectly() {
+        const allRows = this.terraTable.querySelectorAll('tr');
+        const dataRows = Array.from(allRows).filter(row => {
+            const cells = row.querySelectorAll('td');
+            return cells.length > 0; // Hàng có td (không chỉ th)
+        });
+
+        return dataRows.length > 0 ? { querySelectorAll: () => dataRows } : null;
+    }
+
+    getDataRows(tbody) {
+        if (tbody.querySelectorAll) {
+            return Array.from(tbody.querySelectorAll('tr'));
+        }
+        return tbody; // Already an array from getRowsDirectly
     }
 
     processDataRows(rows) {
@@ -192,45 +327,65 @@ class TerraTimeAnalyzer {
         let currentDate = null; // Theo dõi ngày hiện tại
 
         rows.forEach((row, index) => {
-            // Thử các cách tìm cell khác nhau
-            let cells = row.querySelectorAll('td .cell');
-
-            // Nếu không có .cell, thử lấy td trực tiếp
-            if (cells.length === 0) {
-                cells = row.querySelectorAll('td');
-            }
-
-            if (cells.length >= 6) { // Ít nhất cần 6 cột
-                const ngayText = this.getCellText(cells[0]);
-                const phanLoaiText = this.getCellText(cells[1]);
-
-                // Cập nhật ngày hiện tại nếu dòng này có ngày
-                if (ngayText && ngayText !== '' && !ngayText.includes('Ngày')) {
-                    currentDate = ngayText;
+            const rowData = this.extractRowData(row, currentDate);
+            
+            if (rowData) {
+                // Cập nhật ngày hiện tại nếu dòng này có ngày mới
+                if (rowData.ngay && this.isValidDate(rowData.ngay)) {
+                    currentDate = rowData.ngay;
                 }
 
-                const rowData = {
-                    ngay: ngayText || currentDate, // Sử dụng ngày hiện tại nếu dòng không có ngày
-                    phanLoai: phanLoaiText,
-                    duKienVao: this.getCellText(cells[2]),
-                    duKienRa: this.getCellText(cells[3]),
-                    thucTeVao: this.getCellTextFromInput(cells[4]), // Cột thực tế vào có input
-                    thucTeRa: this.getCellTextFromInput(cells[5]),   // Cột thực tế ra có input
-                    gioLam: cells.length > 6 ? this.getCellText(cells[6]) : '',
-                    tangCa: cells.length > 7 ? this.getCellText(cells[7]) : ''
-                };
-
-                // Chỉ thêm hàng có phân loại là "Đi làm" (và có ngày hợp lệ)
-                const hasValidDate = rowData.ngay && rowData.ngay !== '' && !rowData.ngay.includes('Ngày');
-                const isWorkRow = rowData.phanLoai && rowData.phanLoai.toLowerCase().includes('đi làm');
-                
-                if (hasValidDate && isWorkRow) {
+                // Chỉ thêm hàng "Đi làm" có ngày hợp lệ
+                if (this.isWorkRow(rowData)) {
                     data.push(rowData);
                 }
             }
         });
 
         return data;
+    }
+
+    extractRowData(row, currentDate) {
+        const cells = this.getRowCells(row);
+        
+        if (cells.length < 6) {
+            return null; // Không đủ cột dữ liệu
+        }
+
+        const ngayText = this.getCellText(cells[0]);
+        
+        return {
+            ngay: ngayText || currentDate, // Sử dụng ngày hiện tại nếu dòng không có ngày
+            phanLoai: this.getCellText(cells[1]),
+            duKienVao: this.getCellText(cells[2]),
+            duKienRa: this.getCellText(cells[3]),
+            thucTeVao: this.getCellTextFromInput(cells[4]), // Cột thực tế vào có input
+            thucTeRa: this.getCellTextFromInput(cells[5]),   // Cột thực tế ra có input
+            gioLam: cells.length > 6 ? this.getCellText(cells[6]) : '',
+            tangCa: cells.length > 7 ? this.getCellText(cells[7]) : ''
+        };
+    }
+
+    getRowCells(row) {
+        // Thử các cách tìm cell khác nhau
+        let cells = row.querySelectorAll('td .cell');
+        
+        // Nếu không có .cell, thử lấy td trực tiếp
+        if (cells.length === 0) {
+            cells = row.querySelectorAll('td');
+        }
+        
+        return cells;
+    }
+
+    isValidDate(dateText) {
+        return dateText && dateText !== '' && !dateText.includes('Ngày');
+    }
+
+    isWorkRow(rowData) {
+        const hasValidDate = this.isValidDate(rowData.ngay);
+        const isWorkType = rowData.phanLoai && rowData.phanLoai.toLowerCase().includes('đi làm');
+        return hasValidDate && isWorkType;
     }
 
     getCellText(cell) {
@@ -278,284 +433,196 @@ class TerraTimeAnalyzer {
     }
 
     calculateTime(data) {
-        console.log('🧮 Bắt đầu tính toán thời gian theo quy tắc Terra...');
+        console.log('🧮 Bắt đầu tính toán thời gian...');
 
-        let tongPhutThieu = 0;
-        let tongPhutThua = 0;
-        let soNgayLamViec = 0;
-        let chiTietNgay = [];
+        const summary = this.initializeSummary();
+        const detailsByDay = [];
 
         data.forEach(row => {
             // Data đã được lọc chỉ chứa dòng "Đi làm" từ processDataRows()
-            // Đếm ngày làm việc đầy đủ
-            soNgayLamViec += 1;
-            const thongTinNgay = this.tinhToanNgay(row);
-            chiTietNgay.push(thongTinNgay);
+            summary.workDays += 1;
+            const dayDetails = this.calculateDayDetails(row);
+            detailsByDay.push(dayDetails);
 
-            tongPhutThieu += thongTinNgay.phutThieu;
-            tongPhutThua += thongTinNgay.phutThua;
+            summary.totalDeficitMinutes += dayDetails.phutThieu;
+            summary.totalOvertimeMinutes += dayDetails.phutThua;
         });
 
-        const phutConThieu = tongPhutThieu - tongPhutThua;
-        const gioConThieu = (phutConThieu / 60).toFixed(2);
-
-        const ketQua = {
-            soNgayLamViec,
-            tongPhutThieu,
-            tongPhutThua,
-            phutConThieu,
-            gioConThieu,
-            tongGioLamDuKien: (soNgayLamViec * 8).toFixed(2), // 8h/ngày
-            tongGioLamThucTe: ((soNgayLamViec * 8 * 60 - phutConThieu) / 60).toFixed(2),
-            chiTietNgay,
-            data
-        };
-
-        console.log('📊 Kết quả tính toán:', ketQua);
-        return ketQua;
+        return this.buildFinalResult(summary, detailsByDay, data);
     }
 
-    tinhToanNgay(rowData) {
+    initializeSummary() {
+        return {
+            workDays: 0,
+            totalDeficitMinutes: 0,
+            totalOvertimeMinutes: 0
+        };
+    }
+
+    buildFinalResult(summary, detailsByDay, originalData) {
+        const netDeficitMinutes = summary.totalDeficitMinutes - summary.totalOvertimeMinutes;
+        const netDeficitHours = (netDeficitMinutes / 60).toFixed(2);
+
+        const result = {
+            soNgayLamViec: summary.workDays,
+            tongPhutThieu: summary.totalDeficitMinutes,
+            tongPhutThua: summary.totalOvertimeMinutes,
+            phutConThieu: netDeficitMinutes,
+            gioConThieu: netDeficitHours,
+            tongGioLamDuKien: (summary.workDays * 8).toFixed(2), // 8h/ngày
+            tongGioLamThucTe: ((summary.workDays * 8 * 60 - netDeficitMinutes) / 60).toFixed(2),
+            chiTietNgay: detailsByDay,
+            data: originalData
+        };
+
+        console.log('📊 Kết quả tính toán:', result);
+        return result;
+    }
+
+    calculateDayDetails(rowData) {
         const { ngay, thucTeVao, thucTeRa } = rowData;
 
         // Xử lý trường hợp thiếu dữ liệu thời gian
-        if (!thucTeVao || !thucTeRa || thucTeVao === '--:--' || thucTeRa === '--:--') {
-            return {
-                ngay,
-                loaiCa: 'Chưa xác định',
-                phutThieu: 0,
-                phutThua: 0
-            };
+        if (!this.hasValidTimeData(thucTeVao, thucTeRa)) {
+            return this.createEmptyDayResult(ngay);
         }
 
-        const thoiGianVao = this.chuanHoaGio(thucTeVao);
-        const thoiGianRa = this.chuanHoaGio(thucTeRa);
+        const timeIn = this.timeToMinutes(thucTeVao);
+        const timeOut = this.timeToMinutes(thucTeRa);
+        const shiftType = this.determineShiftType(timeIn, timeOut);
 
-        // Xác định loại ca
-        let loaiCa = this.xacDinhLoaiCa(thoiGianVao, thoiGianRa);
-
-        // Tính thiếu giờ - bao gồm cả vào muộn và ra sớm
-        const phutThieu = this.tinhPhutThieuDayDu(thoiGianVao, thoiGianRa, loaiCa);
-
-        // Tính thừa giờ
-        const phutThua = this.tinhPhutThua(thoiGianVao, thoiGianRa, loaiCa);
+        // Tính thiếu giờ và thừa giờ
+        const deficitMinutes = this.calculateDeficitMinutes(timeIn, timeOut, shiftType);
+        const overtimeMinutes = this.calculateOvertimeMinutes(timeIn, timeOut, shiftType);
 
         return {
             ngay,
-            loaiCa,
-            thoiGianVao,
-            thoiGianRa,
-            phutThieu,
-            phutThua
+            loaiCa: shiftType,
+            thoiGianVao: timeIn,
+            thoiGianRa: timeOut,
+            phutThieu: deficitMinutes,
+            phutThua: overtimeMinutes
         };
     }
 
-    tinhThoiGianLamThucTe(thoiGianVao, thoiGianRa, loaiCa) {
-        let thoiGianLam = thoiGianRa - thoiGianVao;
+    hasValidTimeData(timeIn, timeOut) {
+        return timeIn && timeOut && timeIn !== '--:--' && timeOut !== '--:--';
+    }
+
+    createEmptyDayResult(ngay) {
+        return {
+            ngay,
+            loaiCa: 'Chưa xác định',
+            phutThieu: 0,
+            phutThua: 0
+        };
+    }
+
+    calculateActualWorkTime(timeIn, timeOut, shiftType) {
+        let workTime = timeOut - timeIn;
         
         // Ca sáng: chỉ tính đến trước 12:00
-        if (loaiCa.includes('Sáng')) {
-            const sangKetThuc = 12 * 60; // 12:00
-            if (thoiGianRa > sangKetThuc) {
-                // Nếu ra sau 12:00, chỉ tính đến 12:00
-                thoiGianLam = sangKetThuc - thoiGianVao;
+        if (shiftType === SHIFT_TYPES.MORNING) {
+            const morningEnd = TIME_CONSTANTS.STANDARD_TIMES.MORNING_END;
+            if (timeOut > morningEnd) {
+                workTime = morningEnd - timeIn;
             }
         }
         // Ca chiều: chỉ tính từ 13:00 trở đi
-        else if (loaiCa.includes('Chiều')) {
-            const chieuBatDau = 13 * 60; // 13:00
-            if (thoiGianVao < chieuBatDau) {
-                // Nếu vào trước 13:00, chỉ tính từ 13:00
-                thoiGianLam = thoiGianRa - chieuBatDau;
+        else if (shiftType === SHIFT_TYPES.AFTERNOON) {
+            const afternoonStart = TIME_CONSTANTS.STANDARD_TIMES.AFTERNOON_START;
+            if (timeIn < afternoonStart) {
+                workTime = timeOut - afternoonStart;
             }
         }
         // Ca toàn thời gian: trừ thời gian nghỉ trưa (12:00-13:00)
-        else {
-            const nghiTruaBatDau = 12 * 60; // 12:00
-            const nghiTruaKetThuc = 13 * 60; // 13:00
+        else if (shiftType === SHIFT_TYPES.FULL_DAY) {
+            const lunchStart = TIME_CONSTANTS.STANDARD_TIMES.MORNING_END;
+            const lunchEnd = TIME_CONSTANTS.STANDARD_TIMES.AFTERNOON_START;
             
             // Chỉ trừ nghỉ trưa nếu làm việc qua khung 12:00-13:00
-            if (thoiGianVao < nghiTruaKetThuc && thoiGianRa > nghiTruaBatDau) {
-                const batDauNghiTrua = Math.max(thoiGianVao, nghiTruaBatDau);
-                const ketThucNghiTrua = Math.min(thoiGianRa, nghiTruaKetThuc);
-                const thoiGianNghiTrua = ketThucNghiTrua - batDauNghiTrua;
-                thoiGianLam -= thoiGianNghiTrua;
+            if (timeIn < lunchEnd && timeOut > lunchStart) {
+                const actualLunchStart = Math.max(timeIn, lunchStart);
+                const actualLunchEnd = Math.min(timeOut, lunchEnd);
+                const lunchTime = actualLunchEnd - actualLunchStart;
+                workTime -= lunchTime;
             }
         }
         
-        return Math.max(0, thoiGianLam); // Không để âm
+        return Math.max(0, workTime);
     }
 
-    chuanHoaGio(timeStr) {
-        // Chuyển đổi thời gian thành phút từ 00:00
-        const parts = timeStr.split(':');
-        const hours = parseInt(parts[0]) || 0;
-        const minutes = parseInt(parts[1]) || 0;
-        return hours * 60 + minutes;
+    // === CALCULATION METHODS ===
+    calculateDeficitMinutes(timeIn, timeOut, shiftType) {
+        const flexRange = this.getFlexibleRange(shiftType);
+        const requiredHours = this.getRequiredWorkHours(shiftType);
+        let deficitMinutes = 0;
+
+        // 1. Check late arrival (beyond flexible range)
+        if (timeIn > flexRange.end) {
+            deficitMinutes += timeIn - flexRange.end;
+        }
+
+        // 2. Calculate expected end time using hybrid logic
+        const expectedEndTime = this.calculateExpectedEndTime(timeIn, shiftType);
+
+        // 3. Check early departure
+        if (timeOut < expectedEndTime) {
+            deficitMinutes += expectedEndTime - timeOut;
+        }
+
+        // 4. Verify actual work time meets requirements
+        const actualWorkTime = this.calculateActualWorkTime(timeIn, timeOut, shiftType);
+        if (actualWorkTime < requiredHours) {
+            const workDeficit = requiredHours - actualWorkTime;
+            // Use the maximum of calculated deficit or work time deficit
+            deficitMinutes = Math.max(deficitMinutes, workDeficit);
+        }
+
+        return deficitMinutes;
     }
 
-    phutSangGio(phut) {
-        const h = Math.floor(phut / 60);
-        const m = phut % 60;
-        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-    }
-
-    xacDinhLoaiCa(thoiGianVao, thoiGianRa) {
-        const giua_ngay = 12 * 60; // 12:00 = 720 phút
-        const mot_gio_chieu = 13 * 60; // 13:00 = 780 phút
-
-        // Ca sáng: vào và ra đều trước 13:00
-        if (thoiGianVao < mot_gio_chieu && thoiGianRa < mot_gio_chieu) {
-            return 'Sáng';
-        }
-        // Ca chiều: vào sau 12:00
-        else if (thoiGianVao > giua_ngay) {
-            return 'Chiều';
-        }
-        // Ca toàn thời gian: vào trước 13:00 và ra sau 13:00
-        else {
-            return 'Đầy đủ';
-        }
-    }
-
-    tinhPhutThieuDayDu(thoiGianVao, thoiGianRa, loaiCa) {
-        // Logic HYBRID: Dynamic cho vào trong khung flexible, Fixed cho vào muộn
-        let gio_vao_chuan, gio_lam_yeu_cau;
-        let gio_flex_start, gio_flex_end; // Khung giờ flexible
-
-        // Xác định khung giờ chuẩn và flexible theo loại ca
-        if (loaiCa.includes('Chiều')) {
-            gio_vao_chuan = 13 * 60; // 13:00
-            gio_lam_yeu_cau = 4 * 60; // 4 giờ = 240 phút
-            gio_flex_start = 13 * 60; // 13:00
-            gio_flex_end = 13 * 60 + 30; // 13:30
-        } else if (loaiCa.includes('Sáng')) {
-            gio_vao_chuan = 8 * 60 + 30; // 08:30
-            gio_lam_yeu_cau = 4 * 60; // 4 giờ = 240 phút
-            gio_flex_start = 7 * 60 + 30; // 07:30
-            gio_flex_end = 8 * 60; // 08:00
-        } else {
-            // Ca toàn thời gian
-            gio_vao_chuan = 8 * 60 + 30; // 08:30
-            gio_lam_yeu_cau = 8 * 60; // 8 giờ = 480 phút
-            gio_flex_start = 7 * 60 + 30; // 07:30
-            gio_flex_end = 8 * 60 + 30; // 08:30
-        }
-
-        let phutThieu = 0;
-
-        // 1. Tính vào muộn dựa trên khung flexible
-        if (thoiGianVao > gio_flex_end) {
-            const phutMuon = thoiGianVao - gio_flex_end;
-            phutThieu += phutMuon;
-        }
-
-        // 2. Tính giờ ra chuẩn (HYBRID LOGIC)
-        let gio_ra_chuan;
-        if (loaiCa.includes('Chiều')) {
-            // Ca chiều: dynamic - vào + 4h
-            gio_ra_chuan = Math.max(thoiGianVao, gio_flex_start) + gio_lam_yeu_cau;
-        } else if (loaiCa.includes('Sáng')) {
-            // Ca sáng: dynamic - vào + 4h (tối đa đến 12:00)
-            const gio_ra_dynamic = Math.max(thoiGianVao, gio_flex_start) + gio_lam_yeu_cau;
-            gio_ra_chuan = Math.min(gio_ra_dynamic, 12 * 60); // Không quá 12:00
-        } else {
-            // Ca toàn thời gian: Dynamic nếu vào trong khung flexible, Fixed nếu vào muộn
-            if (thoiGianVao <= gio_flex_end) {
-                // Vào trong khung flexible (7:30-8:30) → Dynamic
-                const gio_vao_hieu_dung = Math.max(thoiGianVao, gio_flex_start);
-                gio_ra_chuan = gio_vao_hieu_dung + gio_lam_yeu_cau + 60; // Vào + 8h + 1h nghỉ trưa
-            } else {
-                // Vào muộn sau 8:30 → Fixed (17:30)
-                gio_ra_chuan = 17 * 60 + 30; // 17:30 cố định
-            }
-        }
-
-        // 3. Tính ra sớm (so với giờ ra chuẩn)
-        if (thoiGianRa < gio_ra_chuan) {
-            const phutRaSom = gio_ra_chuan - thoiGianRa;
-            phutThieu += phutRaSom;
-        }
-
-        // 4. Kiểm tra thời gian làm việc thực tế (có trừ nghỉ trưa cho ca toàn thời gian)
-        const phutLamThucTe = this.tinhThoiGianLamThucTe(thoiGianVao, thoiGianRa, loaiCa);
-        const phutCanLam = gio_lam_yeu_cau;
+    calculateOvertimeMinutes(timeIn, timeOut, shiftType) {
+        const expectedEndTime = this.calculateExpectedEndTime(timeIn, shiftType);
         
-        if (phutLamThucTe < phutCanLam) {
-            const phutThieuGioLam = phutCanLam - phutLamThucTe;
-            // Chỉ tính thiếu nếu chưa được tính trong các bước trước
-            if (phutThieu < phutThieuGioLam) {
-                phutThieu = phutThieuGioLam;
-            }
-        }
-
-        return phutThieu;
-    }
-
-    // Hàm tinhPhutRaSom đã được gộp vào tinhPhutThieuDayDu (logic bù trừ)
-
-    tinhPhutThua(thoiGianVao, thoiGianRa, loaiCa) {
-        // Xác định giờ ra chuẩn theo loại ca với logic dynamic
-        let gio_ra_chuan;
-        
-        if (loaiCa.includes('Chiều')) {
-            // Ca chiều: dynamic - vào + 4h (tối thiểu từ 13:00)
-            gio_ra_chuan = Math.max(thoiGianVao, 13 * 60) + 4 * 60;
-        } else if (loaiCa.includes('Sáng')) {
-            // Ca sáng: dynamic - vào + 4h (tối thiểu từ 7:30, tối đa đến 12:00)
-            const gio_ra_dynamic = Math.max(thoiGianVao, 7 * 60 + 30) + 4 * 60;
-            gio_ra_chuan = Math.min(gio_ra_dynamic, 12 * 60); // Không quá 12:00
-        } else {
-            // Ca toàn thời gian: Hybrid logic giống như tinhPhutThieuDayDu
-            const gio_flex_start = 7 * 60 + 30; // 07:30
-            const gio_flex_end = 8 * 60 + 30; // 08:30
-            const gio_lam_yeu_cau = 8 * 60; // 8 giờ
+        if (timeOut > expectedEndTime) {
+            const overtimeMinutes = timeOut - expectedEndTime;
             
-            if (thoiGianVao <= gio_flex_end) {
-                // Vào trong khung flexible (7:30-8:30) → Dynamic
-                const gio_vao_hieu_dung = Math.max(thoiGianVao, gio_flex_start);
-                gio_ra_chuan = gio_vao_hieu_dung + gio_lam_yeu_cau + 60; // Vào + 8h + 1h nghỉ trưa
-            } else {
-                // Vào muộn sau 8:30 → Fixed (17:30)
-                gio_ra_chuan = 17 * 60 + 30; // 17:30 cố định
+            // Only count if >= 30 minutes
+            if (overtimeMinutes >= TIME_CONSTANTS.OVERTIME.MIN_MINUTES) {
+                // Round down to 15-minute intervals
+                return Math.floor(overtimeMinutes / TIME_CONSTANTS.OVERTIME.ROUND_INTERVAL) * TIME_CONSTANTS.OVERTIME.ROUND_INTERVAL;
             }
         }
-
-        // Kiểm tra xem có làm thêm giờ không
-        if (thoiGianRa > gio_ra_chuan) {
-            const phutThua = thoiGianRa - gio_ra_chuan;
-
-            // CHỈ TÍNH KHI >= 30 PHÚT
-            if (phutThua >= 30) {
-                // Làm tròn xuống 15 phút (theo quy định công ty)
-                const phutThuaLamTron = Math.floor(phutThua / 15) * 15;
-                return phutThuaLamTron;
-            } else {
-                return 0;
-            }
-        }
-
+        
         return 0;
     }
 
-    calculateHours(timeIn, timeOut) {
-        try {
-            const [inHour, inMin] = timeIn.split(':').map(Number);
-            const [outHour, outMin] = timeOut.split(':').map(Number);
-
-            const inMinutes = inHour * 60 + inMin;
-            let outMinutes = outHour * 60 + outMin;
-
-            // Xử lý trường hợp qua ngày
-            if (outMinutes < inMinutes) {
-                outMinutes += 24 * 60;
-            }
-
-            const totalMinutes = outMinutes - inMinutes;
-            return totalMinutes / 60;
-        } catch (error) {
-            console.error('Lỗi tính toán giờ:', error);
-            return 0;
+    calculateExpectedEndTime(timeIn, shiftType) {
+        const flexRange = this.getFlexibleRange(shiftType);
+        const requiredHours = this.getRequiredWorkHours(shiftType);
+        
+        switch (shiftType) {
+            case SHIFT_TYPES.AFTERNOON:
+                // Dynamic: arrival + 4 hours (minimum from 13:00)
+                return Math.max(timeIn, flexRange.start) + requiredHours;
+                
+            case SHIFT_TYPES.MORNING:
+                // Dynamic: arrival + 4 hours (maximum until 12:00)
+                const dynamicEnd = Math.max(timeIn, flexRange.start) + requiredHours;
+                return Math.min(dynamicEnd, TIME_CONSTANTS.STANDARD_TIMES.MORNING_END);
+                
+            case SHIFT_TYPES.FULL_DAY:
+            default:
+                // Hybrid logic: dynamic if within flexible range, fixed if late
+                if (timeIn <= flexRange.end) {
+                    // Within flexible range → dynamic
+                    const effectiveStart = Math.max(timeIn, flexRange.start);
+                    return effectiveStart + requiredHours + TIME_CONSTANTS.WORK_HOURS.LUNCH_BREAK;
+                } else {
+                    // Late arrival → fixed end time
+                    return TIME_CONSTANTS.STANDARD_TIMES.FIXED_END_TIME;
+                }
         }
     }
 
@@ -593,11 +660,11 @@ class TerraTimeAnalyzer {
                 </div>
                 <div class="terra-stat-card">
                     <h3>Tổng phút thiếu</h3>
-                    <div class="value" style="color: #d32f2f;">${analysis.tongPhutThieu}p</div>
+                    <div class="value terra-value-deficit">${analysis.tongPhutThieu}p</div>
                 </div>
                 <div class="terra-stat-card">
                     <h3>Tổng phút thừa</h3>
-                    <div class="value" style="color: #2e7d32;">${analysis.tongPhutThua}p</div>
+                    <div class="value terra-value-surplus">${analysis.tongPhutThua}p</div>
                 </div>
                 <div class="terra-stat-card ${shortageStatus}">
                     <h3>${shortageIcon} ${shortageText}</h3>
@@ -605,18 +672,18 @@ class TerraTimeAnalyzer {
                 </div>
             </div>
             
-            <div style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 13px;">
+            <div class="terra-summary-box">
                 <strong>📋 Tóm tắt:</strong><br>
                 • Giờ chuẩn: ${analysis.tongGioLamDuKien}h (${analysis.soNgayLamViec} ngày × 8h)<br>
                 • Giờ thực tế: ${analysis.tongGioLamThucTe}h<br>
                 • Thiếu: ${analysis.tongPhutThieu} phút | Thừa: ${analysis.tongPhutThua} phút<br>
                 • <strong>Kết quả: ${analysis.phutConThieu > 0 ? 'Cần bù' : 'Đã đủ'} ${shortageUnit}</strong><br>
-                <small style="color: #666;">* Chỉ tính thừa giờ khi >= 30 phút, làm tròn xuống 15p</small>
+                <small class="terra-text-muted">* Chỉ tính thừa giờ khi >= 30 phút, làm tròn xuống 15p</small>
             </div>
             
-            <div class="terra-actions" style="display: flex; gap: 10px; width: 100%; margin-top: 20px;">
-                <button class="terra-btn terra-btn-primary" id="terra-detail-btn" style="flex: 1; padding: 12px 24px; font-size: 14px;">📋 Xem chi tiết</button>
-                <button class="terra-btn terra-btn-danger" id="terra-close-btn" style="flex: 1; padding: 12px 24px; font-size: 14px;">✕ Đóng</button>
+            <div class="terra-actions-flex">
+                <button class="terra-btn terra-btn-primary terra-btn-flex" id="terra-detail-btn">📋 Xem chi tiết</button>
+                <button class="terra-btn terra-btn-danger terra-btn-flex" id="terra-close-btn">✕ Đóng</button>
             </div>
         `;
 
@@ -648,32 +715,14 @@ class TerraTimeAnalyzer {
         content.className = 'terra-modal-content';
 
         let tableHTML = `
-            <div class="terra-modal-header" style="position: relative; padding-right: 40px; flex-shrink: 0;">
+            <div class="terra-modal-header terra-modal-header-with-close">
                 <h2>📋 Chi tiết thời gian làm việc</h2>
-                <button class="terra-close-x" id="terra-close-detail-btn" style="
-                    position: absolute;
-                    top: 50%;
-                    right: 15px;
-                    transform: translateY(-50%);
-                    background: none;
-                    border: none;
-                    font-size: 24px;
-                    color: #666;
-                    cursor: pointer;
-                    padding: 5px;
-                    line-height: 1;
-                    border-radius: 50%;
-                    width: 30px;
-                    height: 30px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                " onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='none'">✕</button>
+                <button class="terra-close-x" id="terra-close-detail-btn">✕</button>
             </div>
             
-            <div style="flex: 1; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
+            <div class="terra-table-container">
                 <table class="terra-detail-table">
-                    <thead style="position: sticky; top: 0; background: #f8f9fa; z-index: 1;">
+                    <thead class="terra-table-header-sticky">
                         <tr>
                             <th>Ngày</th>
                             <th>Loại ca</th>
@@ -688,87 +737,48 @@ class TerraTimeAnalyzer {
 
         if (analysis.chiTietNgay && analysis.chiTietNgay.length > 0) {
             analysis.chiTietNgay.forEach(ngay => {
-                const thieuClass = ngay.phutThieu > 0 ? 'style="color: #d32f2f; font-weight: bold;"' : '';
+                const thieuClass = ngay.phutThieu > 0 ? 'terra-text-danger' : '';
                 
                 // Tạo text cho cột thừa giờ với khoảng thời gian
                 let thuaText = '-';
                 if (ngay.phutThua > 0) {
-                    // Tính khoảng thời gian thừa để hiển thị
-                    let gio_ra_chuan_hien_thi;
-                    if (ngay.loaiCa.includes('Chiều')) {
-                        gio_ra_chuan_hien_thi = Math.max(ngay.thoiGianVao, 13 * 60) + 4 * 60;
-                    } else if (ngay.loaiCa.includes('Sáng')) {
-                        const gio_ra_dynamic = Math.max(ngay.thoiGianVao, 7 * 60 + 30) + 4 * 60;
-                        gio_ra_chuan_hien_thi = Math.min(gio_ra_dynamic, 12 * 60);
-                    } else {
-                        // Ca toàn thời gian: Hybrid logic
-                        const gio_flex_start = 7 * 60 + 30; // 07:30
-                        const gio_flex_end = 8 * 60 + 30; // 08:30
-                        const gio_lam_yeu_cau = 8 * 60; // 8 giờ
-                        
-                        if (ngay.thoiGianVao <= gio_flex_end) {
-                            // Vào trong khung flexible → Dynamic
-                            const gio_vao_hieu_dung = Math.max(ngay.thoiGianVao, gio_flex_start);
-                            gio_ra_chuan_hien_thi = gio_vao_hieu_dung + gio_lam_yeu_cau + 60; // + 1h nghỉ trưa
-                        } else {
-                            // Vào muộn → Fixed 17:30
-                            gio_ra_chuan_hien_thi = 17 * 60 + 30; // 17:30
-                        }
-                    }
-                    
-                    const gioRaChuan = this.phutSangGio(gio_ra_chuan_hien_thi);
-                    const gioRaThucTe = this.phutSangGio(ngay.thoiGianRa);
-                    thuaText = `<span style="color: #2e7d32; font-weight: bold;">${ngay.phutThua}</span> (${gioRaChuan}-${gioRaThucTe})`;
+                    // Sử dụng method calculateExpectedEndTime để tái sử dụng logic
+                    const expectedEndTime = this.calculateExpectedEndTime(ngay.thoiGianVao, ngay.loaiCa);
+                    const gioRaChuan = this.minutesToTime(expectedEndTime);
+                    const gioRaThucTe = this.minutesToTime(ngay.thoiGianRa);
+                    thuaText = `<span class="terra-text-success">${ngay.phutThua}</span> (${gioRaChuan}-${gioRaThucTe})`;
                 }
                 
-                // Màu vàng cho ca sáng/chiều
-                const loaiCaColor = (ngay.loaiCa === 'Sáng' || ngay.loaiCa === 'Chiều') ? 
-                    'style="color: #f57c00; font-weight: bold;"' : '';
+                // Class CSS cho loại ca
+                const loaiCaClass = (ngay.loaiCa === 'Sáng' || ngay.loaiCa === 'Chiều') ? 'terra-text-warning' : '';
 
                 // Detect vào muộn và ra sớm để highlight
-                let gioVaoText = ngay.thoiGianVao ? this.phutSangGio(ngay.thoiGianVao) : '-';
-                let gioRaText = ngay.thoiGianRa ? this.phutSangGio(ngay.thoiGianRa) : '-';
+                let gioVaoText = ngay.thoiGianVao ? this.minutesToTime(ngay.thoiGianVao) : '-';
+                let gioRaText = ngay.thoiGianRa ? this.minutesToTime(ngay.thoiGianRa) : '-';
                 
                 if (ngay.thoiGianVao && ngay.thoiGianRa) {
-                    // Xác định khung giờ flexible theo loại ca
-                    let gio_flex_end, gio_ra_chuan;
-                    
-                    if (ngay.loaiCa.includes('Chiều')) {
-                        gio_flex_end = 13 * 60 + 30; // 13:30
-                        gio_ra_chuan = Math.max(ngay.thoiGianVao, 13 * 60) + 4 * 60;
-                    } else if (ngay.loaiCa.includes('Sáng')) {
-                        gio_flex_end = 8 * 60; // 08:00
-                        const gio_ra_dynamic = Math.max(ngay.thoiGianVao, 7 * 60 + 30) + 4 * 60;
-                        gio_ra_chuan = Math.min(gio_ra_dynamic, 12 * 60);
-                    } else {
-                        // Ca toàn thời gian
-                        gio_flex_end = 8 * 60 + 30; // 08:30
-                        if (ngay.thoiGianVao <= gio_flex_end) {
-                            const gio_vao_hieu_dung = Math.max(ngay.thoiGianVao, 7 * 60 + 30);
-                            gio_ra_chuan = gio_vao_hieu_dung + 8 * 60 + 60; // + 1h nghỉ trưa
-                        } else {
-                            gio_ra_chuan = 17 * 60 + 30; // 17:30
-                        }
-                    }
+                    // Sử dụng helper methods để get flexible range và expected end time
+                    const flexRange = this.getFlexibleRange(ngay.loaiCa);
+                    const expectedEndTime = this.calculateExpectedEndTime(ngay.thoiGianVao, ngay.loaiCa);
                     
                     // Highlight vào muộn
-                    if (ngay.thoiGianVao > gio_flex_end) {
-                        gioVaoText = `<span style="text-decoration: underline;">${gioVaoText}</span>`;
+                    if (ngay.thoiGianVao > flexRange.end) {
+                        gioVaoText = `<span class="terra-text-underline">${gioVaoText}</span>`;
                     }
                     
                     // Highlight ra sớm
-                    if (ngay.thoiGianRa < gio_ra_chuan) {
-                        gioRaText = `<span style="text-decoration: underline;">${gioRaText}</span>`;
+                    if (ngay.thoiGianRa < expectedEndTime) {
+                        gioRaText = `<span class="terra-text-underline">${gioRaText}</span>`;
                     }
                 }
 
                 tableHTML += `
                     <tr>
                         <td>${ngay.ngay}</td>
-                        <td><small ${loaiCaColor}>${ngay.loaiCa}</small></td>
+                        <td><small class="${loaiCaClass}">${ngay.loaiCa}</small></td>
                         <td>${gioVaoText}</td>
                         <td>${gioRaText}</td>
-                        <td ${thieuClass}>${ngay.phutThieu || '-'}</td>
+                        <td class="${thieuClass}">${ngay.phutThieu || '-'}</td>
                         <td>${thuaText}</td>
                     </tr>
                 `;

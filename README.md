@@ -61,8 +61,7 @@
 **Chỉ sử dụng popup extension:**
 1. Click vào icon extension trên thanh công cụ Chrome
 2. Extension sẽ tự động kiểm tra xem có bảng Terra trên trang hiện tại không
-3. Nếu tìm thấy bảng: Click nút **"📊 Phân tích"** 
-4. Nếu chưa tìm thấy bảng: Click nút **"🔍 Quét lại"** để tìm kiếm lại
+3. Nếu chưa tìm thấy bảng: Click nút **"🔍 Quét lại"** để tìm kiếm lại
 
 ### Bước 3: Xem kết quả
 - **Số ngày làm việc:** Tổng số ngày đã làm việc (bao gồm nghỉ nửa ngày)
