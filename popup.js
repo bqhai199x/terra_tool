@@ -16,6 +16,8 @@ class TerraPopup {
             
             // Kiểm tra trang Terra
             await this.checkTerraPage();
+
+            await this.rescanPage();
             
         } catch (error) {
             console.error('Lỗi khởi tạo popup:', error);

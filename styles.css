@@ -50,13 +50,15 @@
     background: white !important;
     padding: 30px !important;
     border-radius: 16px !important;
-    max-width: 900px !important;
+    max-width: 700px !important;
     width: 95% !important;
     max-height: 85% !important;
     overflow-y: auto !important;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15) !important;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
     position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 .terra-modal-header {
@@ -181,7 +183,7 @@
 .terra-detail-table {
     width: 100% !important;
     border-collapse: collapse !important;
-    margin: 20px 0 !important;
+    margin: 0 !important;
     font-size: 13px !important;
 }
 
@@ -255,4 +257,110 @@
 .terra-modal-content * {
     box-sizing: border-box !important;
     line-height: normal !important;
+}
+
+/* ===========================================
+   TERRA TIME CALCULATION STYLES
+   =========================================== */
+
+/* Text color classes */
+.terra-text-danger {
+    color: #d32f2f !important;
+    font-weight: bold !important;
+}
+
+.terra-text-success {
+    color: #2e7d32 !important;
+    font-weight: bold !important;
+}
+
+.terra-text-warning {
+    color: #f57c00 !important;
+    font-weight: bold !important;
+}
+
+.terra-text-muted {
+    color: #666 !important;
+}
+
+/* Modal header positioning */
+.terra-modal-header-with-close {
+    position: relative !important;
+    padding-right: 40px !important;
+    flex-shrink: 0 !important;
+}
+
+/* Close button */
+.terra-close-x {
+    position: absolute !important;
+    top: 50% !important;
+    right: 15px !important;
+    transform: translateY(-50%) !important;
+    background: none !important;
+    border: none !important;
+    font-size: 24px !important;
+    color: #666 !important;
+    cursor: pointer !important;
+    padding: 5px !important;
+    line-height: 1 !important;
+    border-radius: 50% !important;
+    width: 30px !important;
+    height: 30px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: background-color 0.2s ease !important;
+}
+
+.terra-close-x:hover {
+    background: #f0f0f0 !important;
+}
+
+/* Table container */
+.terra-table-container {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    border: 1px solid #ddd !important;
+    border-radius: 8px !important;
+}
+
+/* Table header sticky */
+.terra-table-header-sticky {
+    position: sticky !important;
+    top: 0 !important;
+    background: #f8f9fa !important;
+    z-index: 1 !important;
+}
+
+/* Summary box */
+.terra-summary-box {
+    margin: 15px 0 !important;
+    padding: 15px !important;
+    background: #f8f9fa !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+}
+
+/* Action buttons container */
+.terra-actions-flex {
+    display: flex !important;
+    gap: 10px !important;
+    width: 100% !important;
+    margin-top: 20px !important;
+}
+
+/* Flexible button */
+.terra-btn-flex {
+    flex: 1 !important;
+    padding: 12px 24px !important;
+    font-size: 14px !important;
+}
+
+/* Statistical value colors */
+.terra-value-deficit {
+    color: #d32f2f !important;
+}
+
+.terra-value-surplus {
+    color: #2e7d32 !important;
 }

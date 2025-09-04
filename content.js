@@ -107,13 +107,10 @@ class TerraTimeAnalyzer {
 
         // Tìm bảng có header chứa "Ngày", "Phân loại", "Dự kiến", "Thực tế"
         const tables = document.querySelectorAll('table');
-        console.log(`Tìm thấy ${tables.length} bảng trên trang`);
 
         for (let table of tables) {
             const headers = table.querySelectorAll('th .cell, th');
             const headerTexts = Array.from(headers).map(h => h.textContent.trim());
-
-            console.log('Header texts:', headerTexts);
 
             // Kiểm tra các pattern khác nhau cho bảng Terra
             const hasNgay = headerTexts.some(text => text.includes('Ngày') || text.includes('Date'));
@@ -123,8 +120,6 @@ class TerraTimeAnalyzer {
 
             if (hasNgay && (hasPhanLoai || hasDuKien || hasThucTe)) {
                 this.terraTable = table;
-                console.log('✅ Đã tìm thấy bảng Terra:', table);
-                console.log('Headers found:', headerTexts);
                 return true;
             }
         }
@@ -137,7 +132,6 @@ class TerraTimeAnalyzer {
             const allText = table.textContent.toLowerCase();
             if (allText.includes('ngày') && (allText.includes('dự kiến') || allText.includes('thực tế'))) {
                 this.terraTable = table;
-                console.log('✅ Tìm thấy bảng Terra theo nội dung:', table);
                 return true;
             }
         }
@@ -171,7 +165,6 @@ class TerraTimeAnalyzer {
         // Cách 3: Tìm tất cả tr có data (không phải header)
         if (!tbody) {
             const allRows = this.terraTable.querySelectorAll('tr');
-            console.log(`Tìm thấy ${allRows.length} hàng tổng cộng`);
 
             // Lọc ra những hàng không phải header
             const dataRows = Array.from(allRows).filter(row => {
@@ -180,7 +173,6 @@ class TerraTimeAnalyzer {
             });
 
             if (dataRows.length > 0) {
-                console.log(`Tìm thấy ${dataRows.length} hàng dữ liệu`);
                 return this.processDataRows(dataRows);
             }
         }
@@ -191,7 +183,6 @@ class TerraTimeAnalyzer {
         }
 
         const rows = tbody.querySelectorAll('tr');
-        console.log(`Tìm thấy ${rows.length} hàng trong tbody`);
 
         return this.processDataRows(Array.from(rows));
     }
@@ -208,8 +199,6 @@ class TerraTimeAnalyzer {
             if (cells.length === 0) {
                 cells = row.querySelectorAll('td');
             }
-
-            console.log(`Hàng ${index + 1}: ${cells.length} ô`);
 
             if (cells.length >= 6) { // Ít nhất cần 6 cột
                 const ngayText = this.getCellText(cells[0]);
@@ -231,22 +220,16 @@ class TerraTimeAnalyzer {
                     tangCa: cells.length > 7 ? this.getCellText(cells[7]) : ''
                 };
 
-                console.log('Dữ liệu hàng:', rowData);
-
                 // Chỉ thêm hàng có phân loại là "Đi làm" (và có ngày hợp lệ)
                 const hasValidDate = rowData.ngay && rowData.ngay !== '' && !rowData.ngay.includes('Ngày');
                 const isWorkRow = rowData.phanLoai && rowData.phanLoai.toLowerCase().includes('đi làm');
                 
                 if (hasValidDate && isWorkRow) {
                     data.push(rowData);
-                    console.log(`✅ Thêm dòng đi làm: ${rowData.ngay} - ${rowData.phanLoai}`);
-                } else if (hasValidDate) {
-                    console.log(`⏭️ Bỏ qua dòng không phải đi làm: ${rowData.ngay} - ${rowData.phanLoai}`);
                 }
             }
         });
 
-        console.log(`✅ Trích xuất được ${data.length} hàng dữ liệu hợp lệ`);
         return data;
     }
 
@@ -306,15 +289,11 @@ class TerraTimeAnalyzer {
             // Data đã được lọc chỉ chứa dòng "Đi làm" từ processDataRows()
             // Đếm ngày làm việc đầy đủ
             soNgayLamViec += 1;
-            console.log(`📅 Ngày làm việc: ${row.ngay} - ${row.phanLoai}`);
-
             const thongTinNgay = this.tinhToanNgay(row);
             chiTietNgay.push(thongTinNgay);
 
             tongPhutThieu += thongTinNgay.phutThieu;
             tongPhutThua += thongTinNgay.phutThua;
-
-            console.log(`Ngày ${row.ngay}:`, thongTinNgay);
         });
 
         const phutConThieu = tongPhutThieu - tongPhutThua;
@@ -343,10 +322,9 @@ class TerraTimeAnalyzer {
         if (!thucTeVao || !thucTeRa || thucTeVao === '--:--' || thucTeRa === '--:--') {
             return {
                 ngay,
-                loaiCa: 'Không xác định',
+                loaiCa: 'Chưa xác định',
                 phutThieu: 0,
-                phutThua: 0,
-                ghiChu: 'Thiếu dữ liệu thời gian'
+                phutThua: 0
             };
         }
 
@@ -357,8 +335,7 @@ class TerraTimeAnalyzer {
         let loaiCa = this.xacDinhLoaiCa(thoiGianVao, thoiGianRa);
 
         // Tính thiếu giờ - bao gồm cả vào muộn và ra sớm
-        let thongTinThieu;
-        thongTinThieu = this.tinhPhutThieuDayDu(thoiGianVao, thoiGianRa, loaiCa);
+        const phutThieu = this.tinhPhutThieuDayDu(thoiGianVao, thoiGianRa, loaiCa);
 
         // Tính thừa giờ
         const phutThua = this.tinhPhutThua(thoiGianVao, thoiGianRa, loaiCa);
@@ -368,9 +345,8 @@ class TerraTimeAnalyzer {
             loaiCa,
             thoiGianVao,
             thoiGianRa,
-            phutThieu: thongTinThieu.phut,
-            phutThua,
-            ghiChu: thongTinThieu.ghiChu
+            phutThieu,
+            phutThua
         };
     }
 
@@ -378,7 +354,7 @@ class TerraTimeAnalyzer {
         let thoiGianLam = thoiGianRa - thoiGianVao;
         
         // Ca sáng: chỉ tính đến trước 12:00
-        if (loaiCa.includes('Ca sáng')) {
+        if (loaiCa.includes('Sáng')) {
             const sangKetThuc = 12 * 60; // 12:00
             if (thoiGianRa > sangKetThuc) {
                 // Nếu ra sau 12:00, chỉ tính đến 12:00
@@ -386,7 +362,7 @@ class TerraTimeAnalyzer {
             }
         }
         // Ca chiều: chỉ tính từ 13:00 trở đi
-        else if (loaiCa.includes('Ca chiều')) {
+        else if (loaiCa.includes('Chiều')) {
             const chieuBatDau = 13 * 60; // 13:00
             if (thoiGianVao < chieuBatDau) {
                 // Nếu vào trước 13:00, chỉ tính từ 13:00
@@ -430,15 +406,15 @@ class TerraTimeAnalyzer {
 
         // Ca sáng: vào và ra đều trước 13:00
         if (thoiGianVao < mot_gio_chieu && thoiGianRa < mot_gio_chieu) {
-            return 'Ca sáng';
+            return 'Sáng';
         }
         // Ca chiều: vào sau 12:00
         else if (thoiGianVao > giua_ngay) {
-            return 'Ca chiều';
+            return 'Chiều';
         }
         // Ca toàn thời gian: vào trước 13:00 và ra sau 13:00
         else {
-            return 'Ca toàn thời gian';
+            return 'Đầy đủ';
         }
     }
 
@@ -448,12 +424,12 @@ class TerraTimeAnalyzer {
         let gio_flex_start, gio_flex_end; // Khung giờ flexible
 
         // Xác định khung giờ chuẩn và flexible theo loại ca
-        if (loaiCa.includes('Ca chiều')) {
+        if (loaiCa.includes('Chiều')) {
             gio_vao_chuan = 13 * 60; // 13:00
             gio_lam_yeu_cau = 4 * 60; // 4 giờ = 240 phút
             gio_flex_start = 13 * 60; // 13:00
             gio_flex_end = 13 * 60 + 30; // 13:30
-        } else if (loaiCa.includes('Ca sáng')) {
+        } else if (loaiCa.includes('Sáng')) {
             gio_vao_chuan = 8 * 60 + 30; // 08:30
             gio_lam_yeu_cau = 4 * 60; // 4 giờ = 240 phút
             gio_flex_start = 7 * 60 + 30; // 07:30
@@ -467,89 +443,82 @@ class TerraTimeAnalyzer {
         }
 
         let phutThieu = 0;
-        let ghiChu = '';
 
-        // Tính toán thiếu giờ cho tất cả loại ca
+        // 1. Tính vào muộn dựa trên khung flexible
+        if (thoiGianVao > gio_flex_end) {
+            const phutMuon = thoiGianVao - gio_flex_end;
+            phutThieu += phutMuon;
+        }
 
-            // 1. Tính vào muộn dựa trên khung flexible
-            if (thoiGianVao > gio_flex_end) {
-                const phutMuon = thoiGianVao - gio_flex_end;
-                phutThieu += phutMuon;
-                if (loaiCa.includes('Ca chiều')) {
-                    ghiChu += `Vào muộn: ${phutMuon}p (sau 13:30); `;
-                } else if (loaiCa.includes('Ca sáng')) {
-                    ghiChu += `Vào muộn: ${phutMuon}p (sau 08:00); `;
-                } else {
-                    ghiChu += `Vào muộn: ${phutMuon}p (sau 08:00); `;
-                }
-            }
-
-            // 2. Tính giờ ra chuẩn (HYBRID LOGIC)
-            let gio_ra_chuan;
-            if (loaiCa.includes('Ca chiều')) {
-                // Ca chiều: dynamic trong khung flexible
-                gio_ra_chuan = thoiGianVao + gio_lam_yeu_cau; // Vào + 4h
-            } else if (loaiCa.includes('Ca sáng')) {
-                // Ca sáng: dynamic trong khung flexible
-                gio_ra_chuan = thoiGianVao + gio_lam_yeu_cau; // Vào + 4h
+        // 2. Tính giờ ra chuẩn (HYBRID LOGIC)
+        let gio_ra_chuan;
+        if (loaiCa.includes('Chiều')) {
+            // Ca chiều: dynamic - vào + 4h
+            gio_ra_chuan = Math.max(thoiGianVao, gio_flex_start) + gio_lam_yeu_cau;
+        } else if (loaiCa.includes('Sáng')) {
+            // Ca sáng: dynamic - vào + 4h (tối đa đến 12:00)
+            const gio_ra_dynamic = Math.max(thoiGianVao, gio_flex_start) + gio_lam_yeu_cau;
+            gio_ra_chuan = Math.min(gio_ra_dynamic, 12 * 60); // Không quá 12:00
+        } else {
+            // Ca toàn thời gian: Dynamic nếu vào trong khung flexible, Fixed nếu vào muộn
+            if (thoiGianVao <= gio_flex_end) {
+                // Vào trong khung flexible (7:30-8:30) → Dynamic
+                const gio_vao_hieu_dung = Math.max(thoiGianVao, gio_flex_start);
+                gio_ra_chuan = gio_vao_hieu_dung + gio_lam_yeu_cau + 60; // Vào + 8h + 1h nghỉ trưa
             } else {
-                // Ca toàn: Dynamic nếu vào trong khung flexible, Fixed nếu vào muộn
-                if (thoiGianVao <= gio_flex_end) {
-                    // Vào trong khung flexible (7:30-8:00) → Dynamic
-                    const gio_vao_flex = Math.max(thoiGianVao, gio_flex_start);
-                    gio_ra_chuan = gio_vao_flex + gio_lam_yeu_cau + 60; // Vào + 8h + 1h nghỉ trưa
-                } else {
-                    // Vào muộn sau 8:00 → Fixed (bị phạt)
-                    gio_ra_chuan = 17 * 60 + 30; // 17:30 cố định
-                }
+                // Vào muộn sau 8:30 → Fixed (17:30)
+                gio_ra_chuan = 17 * 60 + 30; // 17:30 cố định
             }
+        }
 
-            // 3. Tính ra sớm (so với giờ ra chuẩn)
-            if (thoiGianRa < gio_ra_chuan) {
-                const phutRaSom = gio_ra_chuan - thoiGianRa;
-                phutThieu += phutRaSom;
-                ghiChu += `Ra sớm: ${phutRaSom}p (chuẩn: ${this.phutSangGio(gio_ra_chuan)}); `;
+        // 3. Tính ra sớm (so với giờ ra chuẩn)
+        if (thoiGianRa < gio_ra_chuan) {
+            const phutRaSom = gio_ra_chuan - thoiGianRa;
+            phutThieu += phutRaSom;
+        }
+
+        // 4. Kiểm tra thời gian làm việc thực tế (có trừ nghỉ trưa cho ca toàn thời gian)
+        const phutLamThucTe = this.tinhThoiGianLamThucTe(thoiGianVao, thoiGianRa, loaiCa);
+        const phutCanLam = gio_lam_yeu_cau;
+        
+        if (phutLamThucTe < phutCanLam) {
+            const phutThieuGioLam = phutCanLam - phutLamThucTe;
+            // Chỉ tính thiếu nếu chưa được tính trong các bước trước
+            if (phutThieu < phutThieuGioLam) {
+                phutThieu = phutThieuGioLam;
             }
+        }
 
-            // 4. Kiểm tra thời gian làm việc thực tế (có trừ nghỉ trưa cho ca toàn thời gian)
-            const phutLamThucTe = this.tinhThoiGianLamThucTe(thoiGianVao, thoiGianRa, loaiCa);
-            const phutCanLam = gio_lam_yeu_cau;
-            
-            if (phutLamThucTe < phutCanLam) {
-                const phutThieuGioLam = phutCanLam - phutLamThucTe;
-                // Chỉ tính thiếu nếu chưa được tính trong các bước trước
-                if (phutThieu < phutThieuGioLam) {
-                    phutThieu = phutThieuGioLam;
-                    ghiChu = `Thiếu giờ làm: ${phutThieuGioLam}p (làm ${(phutLamThucTe/60).toFixed(1)}h/${(phutCanLam/60)}h, đã trừ nghỉ trưa nếu có); `;
-                }
-            }
-
-            // Tạo ghi chú chi tiết
-            if (phutThieu === 0) {
-                ghiChu = `Đủ giờ (${this.phutSangGio(thoiGianVao)} - ${this.phutSangGio(thoiGianRa)}, đã trừ nghỉ trưa nếu có)`;
-            } else {
-                ghiChu = ghiChu.replace(/; $/, '') + ` → Tổng thiếu: ${phutThieu}p`;
-                ghiChu += ` (${this.phutSangGio(thoiGianVao)} - ${this.phutSangGio(thoiGianRa)})`;
-            }
-
-        return {
-            phut: phutThieu,
-            ghiChu: ghiChu
-        };
+        return phutThieu;
     }
 
     // Hàm tinhPhutRaSom đã được gộp vào tinhPhutThieuDayDu (logic bù trừ)
 
     tinhPhutThua(thoiGianVao, thoiGianRa, loaiCa) {
+        // Xác định giờ ra chuẩn theo loại ca với logic dynamic
         let gio_ra_chuan;
-
-        // Xác định giờ ra chuẩn theo loại ca
-        if (loaiCa.includes('Ca chiều')) {
-            gio_ra_chuan = 17 * 60; // 17:00 = 1020 phút cho ca chiều
-        } else if (loaiCa.includes('Ca sáng')) {
-            gio_ra_chuan = 12 * 60 + 30; // 12:30 = 750 phút cho ca sáng
+        
+        if (loaiCa.includes('Chiều')) {
+            // Ca chiều: dynamic - vào + 4h (tối thiểu từ 13:00)
+            gio_ra_chuan = Math.max(thoiGianVao, 13 * 60) + 4 * 60;
+        } else if (loaiCa.includes('Sáng')) {
+            // Ca sáng: dynamic - vào + 4h (tối thiểu từ 7:30, tối đa đến 12:00)
+            const gio_ra_dynamic = Math.max(thoiGianVao, 7 * 60 + 30) + 4 * 60;
+            gio_ra_chuan = Math.min(gio_ra_dynamic, 12 * 60); // Không quá 12:00
         } else {
-            gio_ra_chuan = 17 * 60 + 30; // 17:30 = 1050 phút cho ca toàn thời gian
+            // Ca toàn thời gian: Hybrid logic giống như tinhPhutThieuDayDu
+            const gio_flex_start = 7 * 60 + 30; // 07:30
+            const gio_flex_end = 8 * 60 + 30; // 08:30
+            const gio_lam_yeu_cau = 8 * 60; // 8 giờ
+            
+            if (thoiGianVao <= gio_flex_end) {
+                // Vào trong khung flexible (7:30-8:30) → Dynamic
+                const gio_vao_hieu_dung = Math.max(thoiGianVao, gio_flex_start);
+                gio_ra_chuan = gio_vao_hieu_dung + gio_lam_yeu_cau + 60; // Vào + 8h + 1h nghỉ trưa
+            } else {
+                // Vào muộn sau 8:30 → Fixed (17:30)
+                gio_ra_chuan = 17 * 60 + 30; // 17:30 cố định
+            }
         }
 
         // Kiểm tra xem có làm thêm giờ không
@@ -560,11 +529,8 @@ class TerraTimeAnalyzer {
             if (phutThua >= 30) {
                 // Làm tròn xuống 15 phút (theo quy định công ty)
                 const phutThuaLamTron = Math.floor(phutThua / 15) * 15;
-
-                console.log(`Overtime (${loaiCa}): ${phutThua} phút (>= 30p) → làm tròn xuống ${phutThuaLamTron} phút`);
                 return phutThuaLamTron;
             } else {
-                console.log(`Overtime (${loaiCa}): ${phutThua} phút (< 30p) → KHÔNG TÍNH`);
                 return 0;
             }
         }
@@ -680,43 +646,130 @@ class TerraTimeAnalyzer {
 
         const content = document.createElement('div');
         content.className = 'terra-modal-content';
-        content.style.maxWidth = '900px';
 
         let tableHTML = `
-            <div class="terra-modal-header">
+            <div class="terra-modal-header" style="position: relative; padding-right: 40px; flex-shrink: 0;">
                 <h2>📋 Chi tiết thời gian làm việc</h2>
-                <p>Phân tích từng ngày theo quy tắc Terra</p>
+                <button class="terra-close-x" id="terra-close-detail-btn" style="
+                    position: absolute;
+                    top: 50%;
+                    right: 15px;
+                    transform: translateY(-50%);
+                    background: none;
+                    border: none;
+                    font-size: 24px;
+                    color: #666;
+                    cursor: pointer;
+                    padding: 5px;
+                    line-height: 1;
+                    border-radius: 50%;
+                    width: 30px;
+                    height: 30px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                " onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='none'">✕</button>
             </div>
             
-            <table class="terra-detail-table">
-                <thead>
-                    <tr>
-                        <th>Ngày</th>
-                        <th>Loại ca</th>
-                        <th>Vào</th>
-                        <th>Ra</th>
-                        <th>Thiếu (p)</th>
-                        <th>Thừa (p)</th>
-                        <th>Ghi chú</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div style="flex: 1; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
+                <table class="terra-detail-table">
+                    <thead style="position: sticky; top: 0; background: #f8f9fa; z-index: 1;">
+                        <tr>
+                            <th>Ngày</th>
+                            <th>Loại ca</th>
+                            <th>Vào</th>
+                            <th>Ra</th>
+                            <th>Thiếu (p)</th>
+                            <th>Thừa (p)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         `;
 
         if (analysis.chiTietNgay && analysis.chiTietNgay.length > 0) {
             analysis.chiTietNgay.forEach(ngay => {
                 const thieuClass = ngay.phutThieu > 0 ? 'style="color: #d32f2f; font-weight: bold;"' : '';
-                const thuaClass = ngay.phutThua > 0 ? 'style="color: #2e7d32; font-weight: bold;"' : '';
+                
+                // Tạo text cho cột thừa giờ với khoảng thời gian
+                let thuaText = '-';
+                if (ngay.phutThua > 0) {
+                    // Tính khoảng thời gian thừa để hiển thị
+                    let gio_ra_chuan_hien_thi;
+                    if (ngay.loaiCa.includes('Chiều')) {
+                        gio_ra_chuan_hien_thi = Math.max(ngay.thoiGianVao, 13 * 60) + 4 * 60;
+                    } else if (ngay.loaiCa.includes('Sáng')) {
+                        const gio_ra_dynamic = Math.max(ngay.thoiGianVao, 7 * 60 + 30) + 4 * 60;
+                        gio_ra_chuan_hien_thi = Math.min(gio_ra_dynamic, 12 * 60);
+                    } else {
+                        // Ca toàn thời gian: Hybrid logic
+                        const gio_flex_start = 7 * 60 + 30; // 07:30
+                        const gio_flex_end = 8 * 60 + 30; // 08:30
+                        const gio_lam_yeu_cau = 8 * 60; // 8 giờ
+                        
+                        if (ngay.thoiGianVao <= gio_flex_end) {
+                            // Vào trong khung flexible → Dynamic
+                            const gio_vao_hieu_dung = Math.max(ngay.thoiGianVao, gio_flex_start);
+                            gio_ra_chuan_hien_thi = gio_vao_hieu_dung + gio_lam_yeu_cau + 60; // + 1h nghỉ trưa
+                        } else {
+                            // Vào muộn → Fixed 17:30
+                            gio_ra_chuan_hien_thi = 17 * 60 + 30; // 17:30
+                        }
+                    }
+                    
+                    const gioRaChuan = this.phutSangGio(gio_ra_chuan_hien_thi);
+                    const gioRaThucTe = this.phutSangGio(ngay.thoiGianRa);
+                    thuaText = `<span style="color: #2e7d32; font-weight: bold;">${ngay.phutThua}</span> (${gioRaChuan}-${gioRaThucTe})`;
+                }
+                
+                // Màu vàng cho ca sáng/chiều
+                const loaiCaColor = (ngay.loaiCa === 'Sáng' || ngay.loaiCa === 'Chiều') ? 
+                    'style="color: #f57c00; font-weight: bold;"' : '';
+
+                // Detect vào muộn và ra sớm để highlight
+                let gioVaoText = ngay.thoiGianVao ? this.phutSangGio(ngay.thoiGianVao) : '-';
+                let gioRaText = ngay.thoiGianRa ? this.phutSangGio(ngay.thoiGianRa) : '-';
+                
+                if (ngay.thoiGianVao && ngay.thoiGianRa) {
+                    // Xác định khung giờ flexible theo loại ca
+                    let gio_flex_end, gio_ra_chuan;
+                    
+                    if (ngay.loaiCa.includes('Chiều')) {
+                        gio_flex_end = 13 * 60 + 30; // 13:30
+                        gio_ra_chuan = Math.max(ngay.thoiGianVao, 13 * 60) + 4 * 60;
+                    } else if (ngay.loaiCa.includes('Sáng')) {
+                        gio_flex_end = 8 * 60; // 08:00
+                        const gio_ra_dynamic = Math.max(ngay.thoiGianVao, 7 * 60 + 30) + 4 * 60;
+                        gio_ra_chuan = Math.min(gio_ra_dynamic, 12 * 60);
+                    } else {
+                        // Ca toàn thời gian
+                        gio_flex_end = 8 * 60 + 30; // 08:30
+                        if (ngay.thoiGianVao <= gio_flex_end) {
+                            const gio_vao_hieu_dung = Math.max(ngay.thoiGianVao, 7 * 60 + 30);
+                            gio_ra_chuan = gio_vao_hieu_dung + 8 * 60 + 60; // + 1h nghỉ trưa
+                        } else {
+                            gio_ra_chuan = 17 * 60 + 30; // 17:30
+                        }
+                    }
+                    
+                    // Highlight vào muộn
+                    if (ngay.thoiGianVao > gio_flex_end) {
+                        gioVaoText = `<span style="text-decoration: underline;">${gioVaoText}</span>`;
+                    }
+                    
+                    // Highlight ra sớm
+                    if (ngay.thoiGianRa < gio_ra_chuan) {
+                        gioRaText = `<span style="text-decoration: underline;">${gioRaText}</span>`;
+                    }
+                }
 
                 tableHTML += `
                     <tr>
                         <td>${ngay.ngay}</td>
-                        <td><small>${ngay.loaiCa}</small></td>
-                        <td>${ngay.thoiGianVao ? this.phutSangGio(ngay.thoiGianVao) : '-'}</td>
-                        <td>${ngay.thoiGianRa ? this.phutSangGio(ngay.thoiGianRa) : '-'}</td>
-                        <td ${thieuClass}>${ngay.phutThieu || 0}</td>
-                        <td ${thuaClass}>${ngay.phutThua || 0}</td>
-                        <td><small>${ngay.ghiChu || ''}</small></td>
+                        <td><small ${loaiCaColor}>${ngay.loaiCa}</small></td>
+                        <td>${gioVaoText}</td>
+                        <td>${gioRaText}</td>
+                        <td ${thieuClass}>${ngay.phutThieu || '-'}</td>
+                        <td>${thuaText}</td>
                     </tr>
                 `;
             });
@@ -731,18 +784,14 @@ class TerraTimeAnalyzer {
                         <td>${row.thucTeRa}</td>
                         <td>-</td>
                         <td>-</td>
-                        <td>Dữ liệu gốc</td>
                     </tr>
                 `;
             });
         }
 
         tableHTML += `
-                </tbody>
-            </table>
-            
-            <div class="terra-actions" style="width: 100%; display: flex; justify-content: center; margin-top: 20px;">
-                <button class="terra-btn terra-btn-danger" id="terra-close-detail-btn" style="width: 100%; min-width: 120px; padding: 12px 24px; font-size: 14px;">✕ Đóng</button>
+                    </tbody>
+                </table>
             </div>
         `;
 
