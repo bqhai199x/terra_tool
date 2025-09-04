@@ -30,7 +30,6 @@ class TerraPopup {
         // Event delegation để xử lý các nút được tạo động
         document.addEventListener('click', async (e) => {
             const target = e.target;
-            
             if (target.id === 'analyzeBtn') {
                 await this.analyzeTimesheet();
             } else if (target.id === 'refreshBtn') {
@@ -68,65 +67,83 @@ class TerraPopup {
             if (result && result.found) {
                 this.showTerraInterface(result.data);
             } else {
-                this.showNotTerraPage();
+                this.showError('Lỗi khi quét lại trang');
             }
         } catch (error) {
             console.log('Lỗi kiểm tra trang:', error.message);
-            this.showNotTerraPage();
+            this.showError('Lỗi khi quét lại trang');
         }
     }
 
     async injectContentScript() {
         try {
             // Kiểm tra xem content script đã được inject chưa
-            const testResult = await this.sendMessageToContent({ action: 'ping' });
-            if (testResult && testResult.pong) {
-                this.contentScriptInjected = true;
-                return;
-            }
-        } catch (error) {
-            // Content script chưa được inject, tiếp tục inject
-        }
-
-        try {
-            // Sử dụng chrome.scripting API (Manifest V3)
-            if (chrome.scripting && chrome.scripting.executeScript) {
-                await chrome.scripting.executeScript({
-                    target: { tabId: this.currentTab.id },
-                    files: ['content.js']
-                });
-                this.contentScriptInjected = true;
-            } else {
-                throw new Error('Scripting API not available');
-            }
-        } catch (error) {
-            console.error('Lỗi inject content script:', error);
-            // Fallback: sử dụng chrome.tabs.executeScript (Manifest V2 legacy)
             try {
-                await new Promise((resolve, reject) => {
-                    chrome.tabs.executeScript(this.currentTab.id, {
-                        file: 'content.js'
-                    }, (result) => {
-                        if (chrome.runtime.lastError) {
-                            reject(new Error(chrome.runtime.lastError.message));
-                        } else {
-                            resolve(result);
-                        }
-                    });
-                });
-                this.contentScriptInjected = true;
-            } catch (fallbackError) {
-                console.error('Fallback inject cũng thất bại:', fallbackError);
-                throw new Error('Không thể inject content script');
+                const testResult = await Promise.race([
+                    this.sendMessageToContent({ action: 'ping' }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('No response')), 1000))
+                ]);
+                
+                if (testResult && testResult.pong) {
+                    console.log('Content script đã có sẵn');
+                    this.contentScriptInjected = true;
+                    return;
+                }
+            } catch (error) {
+                console.log('Content script chưa có, cần inject...');
             }
+
+            // Content script chưa được inject hoặc không phản hồi
+            try {
+                // Sử dụng chrome.scripting API (Manifest V3)
+                if (chrome.scripting && chrome.scripting.executeScript) {
+                    await chrome.scripting.executeScript({
+                        target: { tabId: this.currentTab.id },
+                        files: ['content.js']
+                    });
+                    console.log('✅ Inject content script thành công (Manifest V3)');
+                    this.contentScriptInjected = true;
+                } else {
+                    throw new Error('Scripting API not available');
+                }
+            } catch (error) {
+                console.error('Lỗi inject content script:', error);
+                // Fallback: sử dụng chrome.tabs.executeScript (Manifest V2 legacy)
+                try {
+                    await new Promise((resolve, reject) => {
+                        chrome.tabs.executeScript(this.currentTab.id, {
+                            file: 'content.js'
+                        }, (result) => {
+                            if (chrome.runtime.lastError) {
+                                reject(new Error(chrome.runtime.lastError.message));
+                            } else {
+                                resolve(result);
+                            }
+                        });
+                    });
+                    console.log('✅ Inject content script thành công (Fallback)');
+                    this.contentScriptInjected = true;
+                } catch (fallbackError) {
+                    console.error('Fallback inject cũng thất bại:', fallbackError);
+                    throw new Error('Không thể inject content script');
+                }
+            }
+            
+            // Đợi content script khởi tạo
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+        } catch (error) {
+            console.error('Lỗi trong injectContentScript:', error);
+            throw error;
         }
     }
 
     async sendMessageToContent(message) {
         try {
-            return await chrome.tabs.sendMessage(this.currentTab.id, message);
+            const response = await chrome.tabs.sendMessage(this.currentTab.id, message);
+            return response;
         } catch (error) {
-            console.error('Lỗi gửi message:', error);
+            console.error('Lỗi gửi message:', error.message);
             throw error;
         }
     }
@@ -284,10 +301,8 @@ class TerraPopup {
                 </div>
             `;
 
-            // Reset content script injection flag
+            // Reset content script injection flag và inject lại
             this.contentScriptInjected = false;
-            
-            // Inject lại content script
             await this.injectContentScript();
 
             // Gửi lệnh quét lại
