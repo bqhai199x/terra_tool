@@ -2,6 +2,7 @@
 class TerraPopup {
     constructor() {
         this.currentTab = null;
+        this.contentScriptInjected = false;
         this.init();
     }
 
@@ -52,19 +53,16 @@ class TerraPopup {
                 </div>
             `;
 
-            // Inject content script
-            await chrome.scripting.executeScript({
-                target: { tabId: this.currentTab.id },
-                files: ['content.js']
-            });
+            // Inject content script với error handling
+            await this.injectContentScript();
 
             // Đợi một chút để script khởi tạo
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise(resolve => setTimeout(resolve, 500));
 
             // Kiểm tra bảng Terra với timeout
             const result = await Promise.race([
-                chrome.tabs.sendMessage(this.currentTab.id, { action: 'checkTerraTable' }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+                this.sendMessageToContent({ action: 'checkTerraTable' }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
             ]);
 
             if (result && result.found) {
@@ -75,6 +73,61 @@ class TerraPopup {
         } catch (error) {
             console.log('Lỗi kiểm tra trang:', error.message);
             this.showNotTerraPage();
+        }
+    }
+
+    async injectContentScript() {
+        try {
+            // Kiểm tra xem content script đã được inject chưa
+            const testResult = await this.sendMessageToContent({ action: 'ping' });
+            if (testResult && testResult.pong) {
+                this.contentScriptInjected = true;
+                return;
+            }
+        } catch (error) {
+            // Content script chưa được inject, tiếp tục inject
+        }
+
+        try {
+            // Sử dụng chrome.scripting API (Manifest V3)
+            if (chrome.scripting && chrome.scripting.executeScript) {
+                await chrome.scripting.executeScript({
+                    target: { tabId: this.currentTab.id },
+                    files: ['content.js']
+                });
+                this.contentScriptInjected = true;
+            } else {
+                throw new Error('Scripting API not available');
+            }
+        } catch (error) {
+            console.error('Lỗi inject content script:', error);
+            // Fallback: sử dụng chrome.tabs.executeScript (Manifest V2 legacy)
+            try {
+                await new Promise((resolve, reject) => {
+                    chrome.tabs.executeScript(this.currentTab.id, {
+                        file: 'content.js'
+                    }, (result) => {
+                        if (chrome.runtime.lastError) {
+                            reject(new Error(chrome.runtime.lastError.message));
+                        } else {
+                            resolve(result);
+                        }
+                    });
+                });
+                this.contentScriptInjected = true;
+            } catch (fallbackError) {
+                console.error('Fallback inject cũng thất bại:', fallbackError);
+                throw new Error('Không thể inject content script');
+            }
+        }
+    }
+
+    async sendMessageToContent(message) {
+        try {
+            return await chrome.tabs.sendMessage(this.currentTab.id, message);
+        } catch (error) {
+            console.error('Lỗi gửi message:', error);
+            throw error;
         }
     }
 
@@ -156,8 +209,11 @@ class TerraPopup {
                 `;
             }
 
+            // Đảm bảo content script đã được inject
+            await this.injectContentScript();
+
             // Gửi lệnh phân tích
-            const result = await chrome.tabs.sendMessage(this.currentTab.id, { 
+            const result = await this.sendMessageToContent({ 
                 action: 'analyzeTable' 
             });
 
@@ -228,14 +284,20 @@ class TerraPopup {
                 </div>
             `;
 
+            // Reset content script injection flag
+            this.contentScriptInjected = false;
+            
+            // Inject lại content script
+            await this.injectContentScript();
+
             // Gửi lệnh quét lại
-            const result = await chrome.tabs.sendMessage(this.currentTab.id, { 
+            const result = await this.sendMessageToContent({ 
                 action: 'rescanPage' 
             });
 
             if (result && result.found) {
                 // Tìm thấy bảng
-                const tableInfo = await chrome.tabs.sendMessage(this.currentTab.id, { 
+                const tableInfo = await this.sendMessageToContent({ 
                     action: 'checkTerraTable' 
                 });
                 this.showTerraInterface(tableInfo.data);
@@ -251,8 +313,11 @@ class TerraPopup {
 
     async showDetails() {
         try {
+            // Đảm bảo content script đã được inject
+            await this.injectContentScript();
+            
             // Gửi lệnh hiển thị chi tiết với analysis data
-            const result = await chrome.tabs.sendMessage(this.currentTab.id, { 
+            const result = await this.sendMessageToContent({ 
                 action: 'showDetails'
             });
             

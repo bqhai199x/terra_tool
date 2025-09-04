@@ -16,9 +16,9 @@ Dự án Chrome extension hoàn chỉnh để tính toán thời gian làm việ
 - [x] Tạo popup UI để hiển thị kết quả
 - [x] Viết logic tính toán thời gian (hybrid system)
 - [x] Tạo file README.md với hướng dẫn chi tiết
-- [x] **HOÀN THÀNH:** Sửa logic tinhThoiGianLamThucTe để hỗ trợ đầy đủ 3 loại ca
-- [x] **HOÀN THÀNH:** Xác nhận logic hybrid - flexible time (không penalty vào sớm)
-- [x] **HOÀN THÀNH:** Tạo icon set hoàn chỉnh cho extension (16px, 32px, 48px, 128px)
+- [x] Sửa logic tinhThoiGianLamThucTe để hỗ trợ đầy đủ 3 loại ca
+- [x] Xác nhận logic hybrid - flexible time (không penalty vào sớm)
+- [x] Tạo icon set hoàn chỉnh cho extension (16px, 32px, 48px, 128px)
 
 ## Tiến trình còn lại
 - [ ] Test extension trên trang Terra thực tế
@@ -69,7 +69,7 @@ Dự án Chrome extension hoàn chỉnh để tính toán thời gian làm việ
 
 ### Smart Calculation Features
 - **Dynamic vs Fixed:** Flexible start time vs fixed end time based on arrival
-- **Lunch Break Handling:** Tự động trừ 1h nghỉ trưa (12:00-13:00) cho ca toàn
+- **Lunch Break Handling:** Tự động trừ 1h nghỉ trưa (12:00-13:00) cho ca toàn thời gian
 - **Overtime Detection:** Tính thừa giờ với quy tắc làm tròn 15 phút
 - **Zero Early Penalty:** Không phạt vào sớm, chỉ flexible time từ start threshold
 
@@ -81,7 +81,7 @@ Dự án Chrome extension hoàn chỉnh để tính toán thời gian làm việ
    Chrome → Extensions → Developer mode → Load unpacked → Select terra_tool folder
    ```
 2. **Navigate to Terra:** Mở trang chấm công Terra timesheet
-3. **Analyze:** Click nút "📊 Tính thời gian còn thiếu" hoặc dùng extension popup
+3. **Analyze:** Sử dụng extension popup
 4. **View Results:** Xem breakdown chi tiết qua modal "📋 Chi tiết"
 
 ### Advanced Features

@@ -1,6 +1,6 @@
 # Terra Time Calculator - Chrome Extension
 
-🕐 **Extension Chrome để tính toán thời gian làm việc còn thiếu trên hệ thống Terra**
+🕐 **Extension Chrome tính toán thời gian làm việc còn thiếu trên hệ thống Terra**
 
 ## 📋 Tính năng
 
@@ -14,9 +14,8 @@
 
 ### 🧠 Logic tính toán thông minh
 - **Hybrid Logic:** Kết hợp Dynamic và Fixed để tính chính xác
-- **Penalty vào sớm:** Tự động phát hiện vào trước 7:30 và cộng penalty 30p
 - **Overtime thông minh:** Chỉ tính thừa giờ >= 30p, làm tròn xuống 15p
-- **Phân biệt ca:** Tự động nhận diện ca toàn thời gian vs ca chiều
+- **Phân biệt ca:** Tự động nhận diện ca toàn thời gian vs nửa ngày
 
 ### 🎯 Hỗ trợ đa dạng
 - **Nghỉ nửa ngày:** Tự động phát hiện và tính toán chính xác
@@ -65,7 +64,7 @@
 
 ### Bước 3: Xem kết quả
 - **Số ngày làm việc:** Tổng số ngày đã làm việc (bao gồm nghỉ nửa ngày)
-- **Phút thiếu:** Tổng số phút thiếu do vào muộn, ra sớm, vào quá sớm
+- **Phút thiếu:** Tổng số phút thiếu do vào muộn, ra sớm
 - **Phút thừa:** Tổng số phút thừa do làm overtime (chỉ tính từ 30p trở lên)
 - **Kết quả:** Thời gian cần bù thêm hoặc đã đủ/thừa
 
@@ -77,7 +76,7 @@
 
 ```
 terra_tool/
-├── manifest.json           # Cấu hình Chrome Extension
+├── manifest.json          # Cấu hình Chrome Extension
 ├── content.js             # Script phân tích trang Terra
 ├── popup.html             # Giao diện popup
 ├── popup.js               # Logic popup
@@ -106,9 +105,9 @@ terra_tool/
 
 ### Quy tắc tính toán
 Extension sử dụng logic phức tạp để tính chính xác theo quy định Terra:
-- **Thiếu giờ:** Vào muộn sau 8:30, penalty 30p nếu vào trước 7:30
-- **Thừa giờ:** Làm sau 17:30 (ca toàn) hoặc 17:00 (ca chiều), chỉ tính từ 30p, làm tròn xuống 15p
-- **Logic Hybrid:** Dynamic cho vào sớm (được thưởng), Fixed cho vào muộn (bị phạt)
+- **Thiếu giờ:** Vào muộn sau 8:30, về sớm hơn 8h/ngày
+- **Thừa giờ:** Làm sau giờ 8h/ngày, chỉ tính từ 30p, làm tròn xuống 15p
+- **Logic Hybrid:** Dynamic cho vào sớm, Fixed cho vào muộn
 - **Hỗ trợ nghỉ nửa ngày:** Tự động phát hiện và tính toán chính xác
 
 Chi tiết xem file [CALCULATION_RULES.md](CALCULATION_RULES.md)
