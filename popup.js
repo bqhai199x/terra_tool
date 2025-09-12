@@ -18,8 +18,6 @@ class TerraPopup {
             // Kiểm tra trang Terra
             await this.checkTerraPage();
 
-            await this.rescanPage();
-            
         } catch (error) {
             console.error('Lỗi khởi tạo popup:', error);
             this.showError('Không thể khởi tạo extension');
@@ -38,6 +36,8 @@ class TerraPopup {
                 await this.rescanPage();
             } else if (target.id === 'detailBtn') {
                 await this.showDetails();
+            } else if (target.id === 'configBtn') {
+                await this.showConfigModal();
             }
         });
     }
@@ -63,9 +63,11 @@ class TerraPopup {
                 this.sendMessageToContent({ action: 'checkTerraTable' }),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
             ]);
-
             if (result && result.found) {
                 this.showTerraInterface(result.data);
+            } else if (result && result.error) {
+                // Handle URL validation error from content script
+                this.showError(result.error);
             } else {
                 this.showError('Lỗi khi quét lại trang');
             }
@@ -165,6 +167,9 @@ class TerraPopup {
             <div class="buttons">
                 <button class="btn-secondary" id="refreshBtn">
                     🔄 Làm mới
+                </button>
+                <button class="btn-config" id="configBtn">
+                    ⚙️ Cấu hình
                 </button>
             </div>
             
@@ -315,7 +320,15 @@ class TerraPopup {
                 const tableInfo = await this.sendMessageToContent({ 
                     action: 'checkTerraTable' 
                 });
-                this.showTerraInterface(tableInfo.data);
+                
+                if (tableInfo && tableInfo.found) {
+                    this.showTerraInterface(tableInfo.data);
+                } else if (tableInfo && tableInfo.error) {
+                    // Handle URL validation error
+                    this.showError(tableInfo.error);
+                } else {
+                    this.showNotTerraPage();
+                }
             } else {
                 // Vẫn không tìm thấy
                 this.showNotTerraPage();
@@ -355,6 +368,22 @@ class TerraPopup {
             }
         } catch (error) {
             console.error('Lỗi hiển thị chi tiết:', error);
+        }
+    }
+
+    async showConfigModal() {
+        try {
+            const result = await this.sendMessageToContent({ action: 'showConfigModal' });
+            if (result && result.success) {
+                // Modal sẽ được hiển thị trên trang web
+                // Đóng popup để người dùng thấy modal rõ hơn
+                window.close();
+            } else {
+                this.showError('Không thể mở cấu hình: ' + (result?.error || 'Lỗi không xác định'));
+            }
+        } catch (error) {
+            console.error('Lỗi mở cấu hình:', error);
+            this.showError('Lỗi kết nối khi mở cấu hình');
         }
     }
 }

@@ -374,3 +374,298 @@
 .terra-text-small {
     font-size: 12px !important;
 }
+
+/* Configuration modal styling */
+.terra-config-modal-content {
+    max-width: 500px !important;
+    width: 90% !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+}
+
+.terra-config-form {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 20px !important;
+}
+
+.terra-config-section {
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 8px !important;
+    padding: 16px !important;
+    background: #fafafa !important;
+}
+
+.terra-config-section h3 {
+    margin: 0 0 12px 0 !important;
+    color: #333 !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+}
+
+.terra-config-row {
+    display: flex !important;
+    align-items: center !important;
+    margin-bottom: 12px !important;
+    gap: 10px !important;
+}
+
+.terra-config-row:last-child {
+    margin-bottom: 0 !important;
+}
+
+.terra-config-row label {
+    flex: 1 !important;
+    font-weight: 500 !important;
+    color: #555 !important;
+    font-size: 14px !important;
+}
+
+.terra-config-row input {
+    width: 80px !important;
+    padding: 6px 8px !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    font-size: 14px !important;
+    text-align: center !important;
+}
+
+.terra-config-row input:focus {
+    outline: none !important;
+    border-color: #4CAF50 !important;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2) !important;
+}
+
+.terra-config-unit {
+    color: #777 !important;
+    font-size: 12px !important;
+    min-width: 30px !important;
+}
+
+.terra-config-calculated {
+    color: #666 !important;
+    font-style: italic !important;
+    font-size: 13px !important;
+    flex: 1 !important;
+}
+
+.terra-config-note {
+    background: #e3f2fd !important;
+    border: 1px solid #bbdefb !important;
+    border-radius: 6px !important;
+    padding: 12px !important;
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+    color: #1565c0 !important;
+}
+
+/* Configuration toast messages */
+.terra-config-toast {
+    position: fixed !important;
+    top: 20px !important;
+    right: 20px !important;
+    z-index: 1000001 !important;
+    padding: 12px 18px !important;
+    border-radius: 6px !important;
+    color: white !important;
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    animation: slideInRight 0.3s ease !important;
+}
+
+.terra-config-toast-success {
+    background: #4CAF50 !important;
+    border-left: 4px solid #2e7d32 !important;
+}
+
+.terra-config-toast-error {
+    background: #f44336 !important;
+    border-left: 4px solid #c62828 !important;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%) !important;
+        opacity: 0 !important;
+    }
+    to {
+        transform: translateX(0) !important;
+        opacity: 1 !important;
+    }
+}
+
+/* ===========================================
+   POPUP STYLES - Terra Extension
+   =========================================== */
+
+/* Popup body styling */
+.terra-popup {
+    width: 370px;
+    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.terra-popup .header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.terra-popup .header h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.terra-popup .header p {
+    margin: 5px 0;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.terra-popup .status {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    backdrop-filter: blur(10px);
+}
+
+.terra-popup .status-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.terra-popup .status-item:last-child {
+    margin-bottom: 0;
+}
+
+.terra-popup .value {
+    font-weight: 600;
+}
+
+.terra-popup .buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.terra-popup button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+    min-width: 100px;
+    font-family: inherit;
+}
+
+.terra-popup .btn-primary {
+    background: #4CAF50;
+    color: white;
+}
+
+.terra-popup .btn-primary:hover {
+    background: #45a049;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.terra-popup .btn-secondary {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.terra-popup .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.terra-popup .btn-config {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    margin-left: 8px;
+}
+
+.terra-popup .btn-config:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.terra-popup .loading {
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+}
+
+.terra-popup .error {
+    background: rgba(244, 67, 54, 0.2);
+    border: 1px solid rgba(244, 67, 54, 0.5);
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    font-size: 13px;
+}
+
+.terra-popup .success {
+    background: rgba(76, 175, 80, 0.2);
+    border: 1px solid rgba(76, 175, 80, 0.5);
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    font-size: 13px;
+}
+
+/* Popup-specific link styling */
+.terra-popup .terra-link-external {
+    color: #64B5F6 !important;
+    text-decoration: none !important;
+    font-weight: 500 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    transition: all 0.2s ease !important;
+    border-bottom: 1px solid rgba(100, 181, 246, 0.5) !important;
+    padding: 2px 4px !important;
+    border-radius: 3px !important;
+}
+
+.terra-popup .terra-link-external:hover {
+    color: #42A5F5 !important;
+    text-decoration: none !important;
+    background: rgba(100, 181, 246, 0.2) !important;
+    border-bottom: 1px solid #42A5F5 !important;
+}
+
+.terra-popup .terra-link-external::after {
+    content: "↗" !important;
+    font-size: 11px !important;
+    opacity: 0.8 !important;
+    margin-left: 2px !important;
+}
+
+/* Error message link styling in popup */
+.terra-popup .error .terra-link-external {
+    color: #90CAF9 !important;
+    font-weight: 600 !important;
+}
+
+.terra-popup .error .terra-link-external:hover {
+    color: #BBDEFB !important;
+    background: rgba(144, 202, 249, 0.2) !important;
+}

@@ -8,6 +8,81 @@ if (window.terraTimeAnalyzerInjected) {
     }
 } else {
     window.terraTimeAnalyzerInjected = true;
+    // Default configuration - can be overridden by user settings
+    const DEFAULT_CONFIG = {
+        WORK_HOURS: {
+            FULL_DAY: 8 * 60
+        },
+        OVERTIME: {
+            MIN_MINUTES: 30,
+            ROUND_INTERVAL: 15
+        }
+    };
+
+    // Configuration management
+    const CONFIG_MANAGER = {
+        // Load configuration from localStorage or use defaults
+        loadConfig() {
+            try {
+                const savedConfig = localStorage.getItem('terra_time_config');
+                if (savedConfig) {
+                    const userConfig = JSON.parse(savedConfig);
+                    return this.mergeConfig(DEFAULT_CONFIG, userConfig);
+                }
+            } catch (error) {
+                console.warn('Failed to load Terra config from localStorage:', error);
+            }
+            return this.getDefaultConfig();
+        },
+
+        // Save configuration to localStorage
+        saveConfig(config) {
+            try {
+                localStorage.setItem('terra_time_config', JSON.stringify(config));
+                return true;
+            } catch (error) {
+                console.error('Failed to save Terra config to localStorage:', error);
+                return false;
+            }
+        },
+
+        // Merge user config with defaults
+        mergeConfig(defaultConfig, userConfig) {
+            const merged = JSON.parse(JSON.stringify(defaultConfig));
+            
+            if (userConfig.WORK_HOURS) {
+                if (userConfig.WORK_HOURS.FULL_DAY) {
+                    merged.WORK_HOURS.FULL_DAY = userConfig.WORK_HOURS.FULL_DAY;
+                }
+            }
+
+            if (userConfig.OVERTIME) {
+                if (userConfig.OVERTIME.MIN_MINUTES) {
+                    merged.OVERTIME.MIN_MINUTES = userConfig.OVERTIME.MIN_MINUTES;
+                }
+                if (userConfig.OVERTIME.ROUND_INTERVAL) {
+                    merged.OVERTIME.ROUND_INTERVAL = userConfig.OVERTIME.ROUND_INTERVAL;
+                }
+            }
+
+            return merged;
+        },
+
+        // Get default configuration
+        getDefaultConfig() {
+            return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+        },
+
+        // Reset to default configuration
+        resetConfig() {
+            localStorage.removeItem('terra_time_config');
+            return this.getDefaultConfig();
+        }
+    };
+
+    // Load current configuration
+    let USER_CONFIG = CONFIG_MANAGER.loadConfig();
+
     // Constants for shift types and time calculations
     const SHIFT_TYPES = {
         MORNING: 'Sáng',
@@ -15,11 +90,14 @@ if (window.terraTimeAnalyzerInjected) {
         FULL_DAY: 'Đầy đủ'
     };
 
+    // Dynamic TIME_CONSTANTS that uses current configuration
     const TIME_CONSTANTS = {
-        WORK_HOURS: {
-            HALF_DAY: 4 * 60,    // 4 hours in minutes
-            FULL_DAY: 8 * 60,    // 8 hours in minutes
-            LUNCH_BREAK: 60      // 1 hour lunch break
+        get WORK_HOURS() {
+            return {
+                HALF_DAY: Math.floor(USER_CONFIG.WORK_HOURS.FULL_DAY / 2),
+                FULL_DAY: USER_CONFIG.WORK_HOURS.FULL_DAY,
+                LUNCH_BREAK: 60
+            };
         },
         FLEXIBLE_RANGES: {
             FULL_DAY: { start: 7 * 60 + 30, end: 8 * 60 + 30 },     // 07:30-08:30
@@ -31,11 +109,20 @@ if (window.terraTimeAnalyzerInjected) {
             AFTERNOON_START: 13 * 60,   // 13:00
             FIXED_END_TIME: 17 * 60 + 30 // 17:30
         },
-        OVERTIME: {
-            MIN_MINUTES: 30,    // Minimum 30 minutes to count
-            ROUND_INTERVAL: 15  // Round down to 15-minute intervals
+        get OVERTIME() {
+            return {
+                MIN_MINUTES: USER_CONFIG.OVERTIME.MIN_MINUTES,
+                ROUND_INTERVAL: USER_CONFIG.OVERTIME.ROUND_INTERVAL
+            };
         }
     };
+
+    // Function to check if current page is Terra timesheet
+    function isTerraTimesheetPage() {
+        const currentUrl = window.location.href;
+        // More strict URL validation - must start with the Terra timesheet URL
+        return currentUrl.startsWith('https://client.terra-plat.vn/time-sheet');
+    }
 
     class TerraTimeAnalyzer {
         constructor() {
@@ -77,6 +164,18 @@ if (window.terraTimeAnalyzerInjected) {
                     case 'rescanPage':
                         await this.handleRescanPage(sendResponse);
                         break;
+                    case 'getConfig':
+                        await this.handleGetConfig(sendResponse);
+                        break;
+                    case 'updateConfig':
+                        await this.handleUpdateConfig(request.config, sendResponse);
+                        break;
+                    case 'resetConfig':
+                        await this.handleResetConfig(sendResponse);
+                        break;
+                    case 'showConfigModal':
+                        await this.handleShowConfigModal(sendResponse);
+                        break;
                     default:
                         sendResponse({ success: false, error: 'Unknown action' });
                 }
@@ -87,6 +186,15 @@ if (window.terraTimeAnalyzerInjected) {
         }
 
         async handleCheckTable(sendResponse) {
+            if (!isTerraTimesheetPage()) {
+                sendResponse({ 
+                    found: false, 
+                    data: null,
+                    error: 'Không phải trang Terra timesheet.<br/>Vui lòng truy cập <a href="https://client.terra-plat.vn/time-sheet" target="_blank" class="terra-link-external">https://client.terra-plat.vn/time-sheet</a>'
+                });
+                return;
+            }
+
             const found = this.findTerraTable();
             const data = found ? this.getTableInfo() : null;
             sendResponse({ found, data });
@@ -124,6 +232,83 @@ if (window.terraTimeAnalyzerInjected) {
                 found: foundTable,
                 message: foundTable ? 'Đã tìm thấy bảng!' : 'Vẫn không tìm thấy bảng'
             });
+        }
+
+        async handleGetConfig(sendResponse) {
+            const currentConfig = {
+                ...USER_CONFIG,
+                WORK_HOURS: {
+                    ...USER_CONFIG.WORK_HOURS,
+                    HALF_DAY: Math.floor(USER_CONFIG.WORK_HOURS.FULL_DAY / 2)
+                }
+            };
+            sendResponse({ success: true, config: currentConfig });
+        }
+
+        async handleUpdateConfig(newConfig, sendResponse) {
+            try {
+                // Validate configuration
+                if (!this.validateConfig(newConfig)) {
+                    throw new Error('Cấu hình không hợp lệ');
+                }
+
+                // Update global config
+                USER_CONFIG = CONFIG_MANAGER.mergeConfig(USER_CONFIG, newConfig);
+                
+                // Save to localStorage
+                const saved = CONFIG_MANAGER.saveConfig(USER_CONFIG);
+                if (!saved) {
+                    throw new Error('Không thể lưu cấu hình');
+                }
+
+                sendResponse({ 
+                    success: true, 
+                    message: 'Cập nhật cấu hình thành công',
+                    config: USER_CONFIG 
+                });
+            } catch (error) {
+                sendResponse({ success: false, error: error.message });
+            }
+        }
+
+        async handleResetConfig(sendResponse) {
+            try {
+                USER_CONFIG = CONFIG_MANAGER.resetConfig();
+                sendResponse({ 
+                    success: true, 
+                    message: 'Đã khôi phục cấu hình mặc định',
+                    config: USER_CONFIG 
+                });
+            } catch (error) {
+                sendResponse({ success: false, error: error.message });
+            }
+        }
+
+        async handleShowConfigModal(sendResponse) {
+            this.showConfigModal();
+            sendResponse({ success: true });
+        }
+
+        validateConfig(config) {
+            if (config.WORK_HOURS) {
+                if (config.WORK_HOURS.FULL_DAY && 
+                    (config.WORK_HOURS.FULL_DAY < 60 || config.WORK_HOURS.FULL_DAY > 12 * 60)) {
+                    return false;
+                }
+            }
+
+            if (config.OVERTIME) {
+                if (config.OVERTIME.MIN_MINUTES && 
+                    (config.OVERTIME.MIN_MINUTES < 1 || config.OVERTIME.MIN_MINUTES > 120)) {
+                    return false;
+                }
+                if (config.OVERTIME.ROUND_INTERVAL && 
+                    (config.OVERTIME.ROUND_INTERVAL < 1 || config.OVERTIME.ROUND_INTERVAL > 60)) {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         reset() {
@@ -460,6 +645,8 @@ if (window.terraTimeAnalyzerInjected) {
         buildFinalResult(summary, detailsByDay, originalData) {
             const netDeficitMinutes = summary.totalDeficitMinutes - summary.totalOvertimeMinutes;
             const netDeficitHours = (netDeficitMinutes / 60).toFixed(2);
+            const dailyWorkHours = USER_CONFIG.WORK_HOURS.FULL_DAY / 60;
+            const dailyWorkMinutes = USER_CONFIG.WORK_HOURS.FULL_DAY;
 
             const result = {
                 soNgayLamViec: summary.workDays,
@@ -467,8 +654,8 @@ if (window.terraTimeAnalyzerInjected) {
                 tongPhutThua: summary.totalOvertimeMinutes,
                 phutConThieu: netDeficitMinutes,
                 gioConThieu: netDeficitHours,
-                tongGioLamDuKien: (summary.workDays * 8).toFixed(2), // 8h/ngày
-                tongGioLamThucTe: ((summary.workDays * 8 * 60 - netDeficitMinutes) / 60).toFixed(2),
+                tongGioLamDuKien: (summary.workDays * dailyWorkHours).toFixed(2),
+                tongGioLamThucTe: ((summary.workDays * dailyWorkMinutes - netDeficitMinutes) / 60).toFixed(2),
                 chiTietNgay: detailsByDay,
                 data: originalData
             };
@@ -585,9 +772,7 @@ if (window.terraTimeAnalyzerInjected) {
             if (timeOut > expectedEndTime) {
                 const overtimeMinutes = timeOut - expectedEndTime;
 
-                // Only count if >= 30 minutes
                 if (overtimeMinutes >= TIME_CONSTANTS.OVERTIME.MIN_MINUTES) {
-                    // Round down to 15-minute intervals
                     return Math.floor(overtimeMinutes / TIME_CONSTANTS.OVERTIME.ROUND_INTERVAL) * TIME_CONSTANTS.OVERTIME.ROUND_INTERVAL;
                 }
             }
@@ -601,23 +786,18 @@ if (window.terraTimeAnalyzerInjected) {
 
             switch (shiftType) {
                 case SHIFT_TYPES.AFTERNOON:
-                    // Dynamic: arrival + 4 hours (minimum from 13:00)
                     return Math.max(timeIn, flexRange.start) + requiredHours;
 
                 case SHIFT_TYPES.MORNING:
-                    // Dynamic: arrival + 4 hours (maximum until 12:00)
                     const dynamicEnd = Math.max(timeIn, flexRange.start) + requiredHours;
                     return Math.min(dynamicEnd, TIME_CONSTANTS.STANDARD_TIMES.MORNING_END);
 
                 case SHIFT_TYPES.FULL_DAY:
                 default:
-                    // Hybrid logic: dynamic if within flexible range, fixed if late
                     if (timeIn <= flexRange.end) {
-                        // Within flexible range → dynamic
                         const effectiveStart = Math.max(timeIn, flexRange.start);
                         return effectiveStart + requiredHours + TIME_CONSTANTS.WORK_HOURS.LUNCH_BREAK;
                     } else {
-                        // Late arrival → fixed end time
                         return TIME_CONSTANTS.STANDARD_TIMES.FIXED_END_TIME;
                     }
             }
@@ -671,15 +851,16 @@ if (window.terraTimeAnalyzerInjected) {
             
             <div class="terra-summary-box">
                 <strong>📋 Tóm tắt:</strong><br>
-                • Giờ chuẩn: ${analysis.tongGioLamDuKien}h (${analysis.soNgayLamViec} ngày × 8h)<br>
+                • Giờ chuẩn: ${analysis.tongGioLamDuKien}h (${analysis.soNgayLamViec} ngày × ${(USER_CONFIG.WORK_HOURS.FULL_DAY / 60).toFixed(1)}h)<br>
                 • Giờ thực tế: ${analysis.tongGioLamThucTe}h<br>
                 • Thiếu: ${analysis.tongPhutThieu} phút | Thừa: ${analysis.tongPhutThua} phút<br>
                 • <strong>Kết quả: ${analysis.phutConThieu > 0 ? 'Cần bù' : 'Đã đủ'} ${shortageUnit}</strong><br>
-                <small class="terra-text-muted">* Chỉ tính thừa giờ khi >= 30 phút, làm tròn xuống 15p</small>
+                <small class="terra-text-muted">* Cấu hình: Tăng ca tối thiểu ${USER_CONFIG.OVERTIME.MIN_MINUTES}p, làm tròn ${USER_CONFIG.OVERTIME.ROUND_INTERVAL}p</small>
             </div>
             
             <div class="terra-actions-flex">
-                <button class="terra-btn terra-btn-primary terra-btn-flex" id="terra-detail-btn">📋 Xem chi tiết</button>
+                <button class="terra-btn terra-btn-secondary terra-btn-flex" id="terra-config-btn">⚙️ Cấu hình</button>
+                <button class="terra-btn terra-btn-primary terra-btn-flex" id="terra-detail-btn">📋 Chi tiết</button>
                 <button class="terra-btn terra-btn-danger terra-btn-flex" id="terra-close-btn">✕ Đóng</button>
             </div>
         `;
@@ -690,6 +871,11 @@ if (window.terraTimeAnalyzerInjected) {
             // Xử lý sự kiện
             document.getElementById('terra-close-btn').addEventListener('click', () => {
                 document.body.removeChild(modal);
+            });
+
+            document.getElementById('terra-config-btn').addEventListener('click', () => {
+                document.body.removeChild(modal);
+                this.showConfigModal();
             });
 
             document.getElementById('terra-detail-btn').addEventListener('click', () => {
@@ -817,10 +1003,156 @@ if (window.terraTimeAnalyzerInjected) {
                 }
             });
         }
+
+        showConfigModal() {
+            // Remove existing config modal if any
+            const existingModal = document.getElementById('terra-config-modal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+
+            const modal = document.createElement('div');
+            modal.id = 'terra-config-modal';
+            modal.className = 'terra-modal-overlay';
+
+            const content = document.createElement('div');
+            content.className = 'terra-modal-content terra-config-modal-content';
+
+            const currentConfig = USER_CONFIG;
+            const fullDayHours = (currentConfig.WORK_HOURS.FULL_DAY / 60).toFixed(1);
+
+            content.innerHTML = `
+                <div class="terra-modal-header">
+                    <h2>⚙️ Cấu hình thời gian làm việc</h2>
+                    <p>Tùy chỉnh quy tắc tính toán theo Terra</p>
+                </div>
+                
+                <form id="terra-config-form" class="terra-config-form">
+                    <div class="terra-config-section">
+                        <h3>📅 Giờ làm việc</h3>
+                        <div class="terra-config-row">
+                            <label for="fullDayHours">Giờ làm ca đầy đủ:</label>
+                            <input type="number" id="fullDayHours" min="4" max="12" step="0.5" value="${fullDayHours}">
+                            <span class="terra-config-unit">giờ</span>
+                        </div>
+                    </div>
+
+                    <div class="terra-config-section">
+                        <h3>⏰ Tăng ca</h3>
+                        <div class="terra-config-row">
+                            <label for="overtimeMin">Tối thiểu tính tăng ca:</label>
+                            <input type="number" id="overtimeMin" min="1" max="120" step="1" value="${currentConfig.OVERTIME.MIN_MINUTES}">
+                            <span class="terra-config-unit">phút</span>
+                        </div>
+                        <div class="terra-config-row">
+                            <label for="roundInterval">Làm tròn xuống:</label>
+                            <input type="number" id="roundInterval" min="1" max="60" step="1" value="${currentConfig.OVERTIME.ROUND_INTERVAL}">
+                            <span class="terra-config-unit">phút</span>
+                        </div>
+                    </div>
+
+                    <div class="terra-config-note">
+                        <strong>📝 Lưu ý:</strong><br>
+                        • Giờ làm nửa ca sẽ tự động bằng ca đầy đủ chia 2<br>
+                        • Tăng ca chỉ tính khi >= thời gian tối thiểu<br>
+                        • Làm tròn xuống theo khoảng thời gian đã chọn<br>
+                        • Cấu hình được lưu trong trình duyệt
+                    </div>
+
+                    <div class="terra-actions-flex">
+                        <button type="button" class="terra-btn terra-btn-secondary" id="terra-config-reset">🔄 Mặc định</button>
+                        <button type="submit" class="terra-btn terra-btn-primary">💾 Lưu</button>
+                    </div>
+                </form>
+            `;
+
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+
+            // Handle form submission
+            document.getElementById('terra-config-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.saveConfigFromForm(modal);
+            });
+
+            // Handle reset button
+            document.getElementById('terra-config-reset').addEventListener('click', () => {
+                this.resetConfigInForm();
+            });
+
+            // Handle modal overlay click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            });
+        }
+
+        saveConfigFromForm(modal) {
+            try {
+                const fullDayHours = parseFloat(document.getElementById('fullDayHours').value);
+                const overtimeMin = parseInt(document.getElementById('overtimeMin').value);
+                const roundInterval = parseInt(document.getElementById('roundInterval').value);
+
+                const newConfig = {
+                    WORK_HOURS: {
+                        FULL_DAY: fullDayHours * 60
+                    },
+                    OVERTIME: {
+                        MIN_MINUTES: overtimeMin,
+                        ROUND_INTERVAL: roundInterval
+                    }
+                };
+
+                if (!this.validateConfig(newConfig)) {
+                    throw new Error('Giá trị cấu hình không hợp lệ');
+                }
+
+                USER_CONFIG = CONFIG_MANAGER.mergeConfig(USER_CONFIG, newConfig);
+                
+                const saved = CONFIG_MANAGER.saveConfig(USER_CONFIG);
+                if (!saved) {
+                    throw new Error('Không thể lưu cấu hình');
+                }
+
+                document.body.removeChild(modal);
+                this.showConfigSuccessMessage('Cập nhật cấu hình thành công!');
+
+            } catch (error) {
+                this.showConfigErrorMessage(error.message);
+            }
+        }
+
+        resetConfigInForm() {
+            const defaultConfig = CONFIG_MANAGER.getDefaultConfig();
+            
+            document.getElementById('fullDayHours').value = (defaultConfig.WORK_HOURS.FULL_DAY / 60).toFixed(1);
+            document.getElementById('overtimeMin').value = defaultConfig.OVERTIME.MIN_MINUTES;
+            document.getElementById('roundInterval').value = defaultConfig.OVERTIME.ROUND_INTERVAL;
+        }
+
+        showConfigSuccessMessage(message) {
+            this.showConfigMessage(message, 'success');
+        }
+
+        showConfigErrorMessage(message) {
+            this.showConfigMessage(message, 'error');
+        }
+
+        showConfigMessage(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `terra-config-toast terra-config-toast-${type}`;
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    document.body.removeChild(toast);
+                }
+            }, 3000);
+        }
     }
 
-    // Store analyzer instance globally to prevent multiple instances
     window.terraAnalyzer = new TerraTimeAnalyzer();
-
-    // End of injection guard
 }
