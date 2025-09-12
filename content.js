@@ -803,92 +803,6 @@ if (window.terraTimeAnalyzerInjected) {
             }
         }
 
-        showResults(analysis) {
-            // Xóa modal cũ nếu có
-            const existingModal = document.getElementById('terra-modal');
-            if (existingModal) {
-                existingModal.remove();
-            }
-
-            // Tạo modal hiển thị kết quả
-            const modal = document.createElement('div');
-            modal.id = 'terra-modal';
-            modal.className = 'terra-modal-overlay';
-
-            const content = document.createElement('div');
-            content.className = 'terra-modal-content';
-
-            const shortageStatus = parseFloat(analysis.phutConThieu) > 0 ? 'shortage' : 'complete';
-            const shortageIcon = parseFloat(analysis.phutConThieu) > 0 ? '⚠️' : '✅';
-            const shortageText = parseFloat(analysis.phutConThieu) > 0 ? 'Còn thiếu' : 'Đã đủ/thừa';
-            const shortageValue = Math.abs(parseFloat(analysis.phutConThieu));
-            const shortageUnit = shortageValue >= 60 ? `${(shortageValue / 60).toFixed(1)}h` : `${shortageValue}p`;
-
-            content.innerHTML = `
-            <div class="terra-modal-header">
-                <h2>📊 Phân tích thời gian Terra</h2>
-                <p>Báo cáo chi tiết theo quy tắc chấm công</p>
-            </div>
-            
-            <div class="terra-stats-grid">
-                <div class="terra-stat-card">
-                    <h3>Ngày làm việc</h3>
-                    <div class="value">${analysis.soNgayLamViec}</div>
-                </div>
-                <div class="terra-stat-card">
-                    <h3>Tổng phút thiếu</h3>
-                    <div class="value terra-value-deficit">${analysis.tongPhutThieu}p</div>
-                </div>
-                <div class="terra-stat-card">
-                    <h3>Tổng phút thừa</h3>
-                    <div class="value terra-value-surplus">${analysis.tongPhutThua}p</div>
-                </div>
-                <div class="terra-stat-card ${shortageStatus}">
-                    <h3>${shortageIcon} ${shortageText}</h3>
-                    <div class="value">${shortageUnit}</div>
-                </div>
-            </div>
-            
-            <div class="terra-summary-box">
-                <strong>📋 Tóm tắt:</strong><br>
-                • Giờ chuẩn: ${analysis.tongGioLamDuKien}h (${analysis.soNgayLamViec} ngày × ${(USER_CONFIG.WORK_HOURS.FULL_DAY / 60).toFixed(1)}h)<br>
-                • Giờ thực tế: ${analysis.tongGioLamThucTe}h<br>
-                • Thiếu: ${analysis.tongPhutThieu} phút | Thừa: ${analysis.tongPhutThua} phút<br>
-                • <strong>Kết quả: ${analysis.phutConThieu > 0 ? 'Cần bù' : 'Đã đủ'} ${shortageUnit}</strong><br>
-                <small class="terra-text-muted">* Cấu hình: Tăng ca tối thiểu ${USER_CONFIG.OVERTIME.MIN_MINUTES}p, làm tròn ${USER_CONFIG.OVERTIME.ROUND_INTERVAL}p</small>
-            </div>
-            
-            <div class="terra-actions-flex">
-                <button class="terra-btn terra-btn-secondary terra-btn-flex" id="terra-config-btn">⚙️ Cấu hình</button>
-                <button class="terra-btn terra-btn-primary terra-btn-flex" id="terra-detail-btn">📋 Chi tiết</button>
-                <button class="terra-btn terra-btn-danger terra-btn-flex" id="terra-close-btn">✕ Đóng</button>
-            </div>
-        `;
-
-            modal.appendChild(content);
-            document.body.appendChild(modal);
-
-            // Xử lý sự kiện
-            document.getElementById('terra-close-btn').addEventListener('click', () => {
-                document.body.removeChild(modal);
-            });
-
-            document.getElementById('terra-config-btn').addEventListener('click', () => {
-                document.body.removeChild(modal);
-                this.showConfigModal();
-            });
-
-            document.getElementById('terra-detail-btn').addEventListener('click', () => {
-                this.showDetailedResults(analysis);
-            });
-
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    document.body.removeChild(modal);
-                }
-            });
-        }
-
         showDetailedResults(analysis) {
             // Tạo modal chi tiết
             const modal = document.createElement('div');
@@ -1038,9 +952,9 @@ if (window.terraTimeAnalyzerInjected) {
                     </div>
 
                     <div class="terra-config-section">
-                        <h3>⏰ Tăng ca</h3>
+                        <h3>⏰ Làm bù</h3>
                         <div class="terra-config-row">
-                            <label for="overtimeMin">Tối thiểu tính tăng ca:</label>
+                            <label for="overtimeMin">Tối thiểu tính làm bù:</label>
                             <input type="number" id="overtimeMin" min="1" max="120" step="1" value="${currentConfig.OVERTIME.MIN_MINUTES}">
                             <span class="terra-config-unit">phút</span>
                         </div>
@@ -1054,7 +968,7 @@ if (window.terraTimeAnalyzerInjected) {
                     <div class="terra-config-note">
                         <strong>📝 Lưu ý:</strong><br>
                         • Giờ làm nửa ca sẽ tự động bằng ca đầy đủ chia 2<br>
-                        • Tăng ca chỉ tính khi >= thời gian tối thiểu<br>
+                        • Làm bù chỉ tính khi >= thời gian tối thiểu<br>
                         • Làm tròn xuống theo khoảng thời gian đã chọn<br>
                         • Cấu hình được lưu trong trình duyệt
                     </div>

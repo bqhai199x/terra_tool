@@ -9,18 +9,26 @@
 - 📊 Hiển thị thông tin thống kê chi tiết
 - 🔧 Logic tính toán thông minh theo quy tắc Terra chính xác
 - 🌟 Hỗ trợ nghỉ nửa ngày và các trường hợp đặc biệt
+- ⚙️ **Cấu hình linh hoạt:** Tùy chỉnh giờ làm việc và quy tắc làm bù
 
 ## ✨ Tính năng nổi bật
 
 ### 🧠 Logic tính toán thông minh
 - **Hybrid Logic:** Kết hợp Dynamic và Fixed để tính chính xác
-- **Overtime thông minh:** Chỉ tính thừa giờ >= 30p, làm tròn xuống 15p
+- **Làm bù thông minh:** Làm bù có thể cấu hình (mặc định ≥30p, làm tròn 15p)
 - **Phân biệt ca:** Tự động nhận diện ca toàn thời gian vs nửa ngày
+- **Cấu hình linh hoạt:** Điều chỉnh giờ làm việc và quy tắc làm bù theo nhu cầu
 
 ### 🎯 Hỗ trợ đa dạng
 - **Nghỉ nửa ngày:** Tự động phát hiện và tính toán chính xác
 - **Tìm bảng thông minh:** Nhiều pattern nhận diện bảng Terra
 - **Giao diện responsive:** Hoạt động mượt mà trên popup nhỏ
+- **URL validation:** Chỉ hoạt động trên trang Terra chính thức
+
+### ⚙️ Hệ thống cấu hình
+- **Giờ làm việc:** Tùy chỉnh ca đầy đủ (4-12 giờ), ca nửa ngày tự động = ca đầy đủ/2
+- **Quy tắc làm bù:** Cấu hình thời gian tối thiểu (1-120 phút) và khoảng làm tròn (1-60 phút)
+- **Lưu trữ bền vững:** Cấu hình được lưu trong localStorage của trình duyệt
 
 ## 🚀 Cài đặt
 
@@ -65,10 +73,17 @@
 ### Bước 3: Xem kết quả
 - **Số ngày làm việc:** Tổng số ngày đã làm việc (bao gồm nghỉ nửa ngày)
 - **Phút thiếu:** Tổng số phút thiếu do vào muộn, ra sớm
-- **Phút thừa:** Tổng số phút thừa do làm overtime (chỉ tính từ 30p trở lên)
+- **Phút làm bù:** Tổng số phút làm bù (tùy theo cấu hình)
 - **Kết quả:** Thời gian cần bù thêm hoặc đã đủ/thừa
 
-### Bước 4: Xem chi tiết
+### Bước 4: Cấu hình (tùy chọn)
+- Click **"⚙️ Cấu hình"** để tùy chỉnh:
+  - **Giờ làm ca đầy đủ:** Từ 4-12 giờ (mặc định 8 giờ)
+  - **Làm bù tối thiểu:** Từ 1-120 phút (mặc định 30 phút)
+  - **Làm tròn làm bù:** Từ 1-60 phút (mặc định 15 phút)
+- Cấu hình được lưu tự động và áp dụng cho các lần sử dụng sau
+
+### Bước 5: Xem chi tiết
 - Click **"📋 Xem chi tiết"** để xem bảng phân tích chi tiết
 - Bảng sẽ hiển thị thông tin từng ngày với thời gian vào/ra và tính toán thiếu/thừa
 
@@ -105,10 +120,11 @@ terra_tool/
 
 ### Quy tắc tính toán
 Extension sử dụng logic phức tạp để tính chính xác theo quy định Terra:
-- **Thiếu giờ:** Vào muộn sau 8:30, về sớm hơn 8h/ngày
-- **Thừa giờ:** Làm sau giờ 8h/ngày, chỉ tính từ 30p, làm tròn xuống 15p
-- **Logic Hybrid:** Dynamic cho vào sớm, Fixed cho vào muộn
+- **Thiếu giờ:** Vào muộn sau flexible range, về sớm hơn giờ chuẩn
+- **Thừa giờ:** Làm thêm sau giờ chuẩn, có thể cấu hình ngưỡng tối thiểu và khoảng làm tròn
+- **Logic Hybrid:** Dynamic cho vào trong flexible range, penalty cho vào muộn
 - **Hỗ trợ nghỉ nửa ngày:** Tự động phát hiện và tính toán chính xác
+- **Cấu hình linh hoạt:** Người dùng có thể tùy chỉnh giờ làm việc và quy tắc làm bù
 
 Chi tiết xem file [CALCULATION_RULES.md](CALCULATION_RULES.md)
 

@@ -2,27 +2,36 @@
 
 ## 📋 Quy tắc tính toán thời gian chấm công Terra
 
-### ⏰ Khung giờ làm việc chuẩn
-- **Ca sáng:** 08:30 - 12:30 (4 tiếng, **TỰ ĐỘNG TRỪ** khoảng 12:00-13:00 nếu làm qua)
-- **Ca chiều:** 13:00 - 17:00 (4 tiếng)  
-- **Ca toàn thời gian:** 08:30 - 17:30 (8 tiếng, **TỰ ĐỘNG TRỪ** nghỉ trưa 12:00-13:00)
+### ⚙️ Hệ thống cấu hình linh hoạt
+
+Extension hỗ trợ cấu hình các tham số chính:
+
+#### 🕐 Cấu hình giờ làm việc
+- **Ca đầy đủ:** 4-12 giờ (mặc định: 8 giờ = 480 phút)
+- **Ca nửa ngày:** Tự động = Ca đầy đủ ÷ 2 (mặc định: 4 giờ = 240 phút)
+- **Nghỉ trưa:** Cố định 1 giờ (12:00-13:00) cho ca toàn thời gian
+
+#### ⏰ Cấu hình làm bù
+- **Thời gian tối thiểu:** 1-120 phút (mặc định: 30 phút)
+- **Khoảng làm tròn:** 1-60 phút (mặc định: 15 phút)
+- **Quy tắc:** Chỉ tính làm bù khi >= thời gian tối thiểu, làm tròn xuống theo khoảng đã cấu hình
+
+#### 💾 Lưu trữ cấu hình
+- Cấu hình được lưu trong localStorage của trình duyệt
+- Tự động khôi phục khi sử dụng extension
+- Có thể reset về mặc định bất kỳ lúc nào
+
+### ⏰ Khung giờ làm việc chuẩn (theo cấu hình)
+- **Ca sáng:** 08:30 - 12:30 (theo cấu hình ca nửa ngày, **TỰ ĐỘNG TRỪ** khoảng 12:00-13:00 nếu làm qua)
+- **Ca chiều:** 13:00 - 17:00 (theo cấu hình ca nửa ngày)  
+- **Ca toàn thời gian:** 08:30 - 17:30 (theo cấu hình ca đầy đủ, **TỰ ĐỘNG TRỪ** nghỉ trưa 12:00-13:00)
 - **⚠️ Lưu ý:** Thời gian 12:00-13:00 **KHÔNG TÍNH** vào giờ làm việc cho TẤT CẢ các ca
+- **🔧 Cấu hình:** Giờ làm việc có thể điều chỉnh trong phần cấu hình extension
 
 ### 🔍 Quy tắc xác định loại ca
 - **Ca sáng:** Vào và ra đều **trước 13:00**
 - **Ca chiều:** Vào **sau 12:00** (bất kể giờ ra)
 - **Ca toàn thời gian:** Vào **trước 13:00** và ra **sau 13:00**
-
-#### Logic phân tích:
-```javascript
-if (thoiGianVao < 13:00 && thoiGianRa < 13:00) {
-    return 'Ca sáng';
-} else if (thoiGianVao > 12:00) {
-    return 'Ca chiều';
-} else {
-    return 'Ca toàn thời gian';
-}
-```
 
 ### 🔴 Quy tắc tính THIẾU GIỜ (Logic Hybrid: Dynamic + Fixed)
 
@@ -36,18 +45,18 @@ if (thoiGianVao < 13:00 && thoiGianRa < 13:00) {
 7. **⚠️ Tất cả các ca**: Tự động loại trừ khoảng 12:00-13:00 khi tính thời gian làm việc
 
 #### Điều kiện:
-- **Ca sáng:** Flexible 07:30-08:00 → 11:30-12:00 (chỉ làm buổi sáng)
-- **Ca chiều:** Flexible 13:00-13:30 → 17:00-17:30 (chỉ làm buổi chiều, bắt đầu từ 13:00)
-- **Ca toàn thời gian:** Flexible 07:30-08:30 → 16:30-17:30 (làm cả ngày, trừ nghỉ trưa)
-- **Thừa giờ >= 30p** mới được tính và làm tròn xuống 15p
+- **Ca sáng:** Flexible 07:30-08:00 → Giờ kết thúc theo cấu hình (chỉ làm buổi sáng)
+- **Ca chiều:** Flexible 13:00-13:30 → Giờ kết thúc theo cấu hình (chỉ làm buổi chiều, bắt đầu từ 13:00)
+- **Ca toàn thời gian:** Flexible 07:30-08:30 → Giờ kết thúc theo cấu hình (làm cả ngày, trừ nghỉ trưa)
+- **Làm bù:** Theo cấu hình (mặc định ≥30p, làm tròn 15p)
 
 #### 2. Các trường hợp cụ thể
 
 ##### Ca sáng (Logic Hybrid - Khung flexible 7:30-8:00)
 - **Ví dụ 1:** 07:25 → 12:40 (trong khung flexible)
-  - Vào trong khung: flex từ 7:30, Làm thực tế: 4h35p (7:30→12:00), Thừa: 10p (12:30→12:40) → **KHÔNG TÍNH** (< 30p) ✅
+  - Vào trong khung: flex từ 7:30, Làm thực tế: theo cấu hình ca nửa ngày, Thừa: tùy theo cấu hình làm bù ✅
 - **Ví dụ 2:** 07:55 → 11:55 (trong khung flexible)
-  - Vào trong khung: 0p thiếu, Ra chuẩn: 11:55 (7:55 + 4h), Ra đúng → **Không thiếu** ✅
+  - Vào trong khung: 0p thiếu, Ra chuẩn: theo cấu hình (7:55 + giờ ca nửa ngày), Ra đúng → **Không thiếu** ✅
 - **Ví dụ 3:** 08:05 → 12:35 (ngoài khung flexible)
   - Vào muộn: 5p (sau 8:00), Làm thực tế: 3h55p (8:05→12:00), Thừa: 5p (12:30→12:35) → **Thiếu 5p** ❌
 
@@ -65,7 +74,7 @@ if (thoiGianVao < 13:00 && thoiGianRa < 13:00) {
 - **Ví dụ 3:** 08:35 → 17:32 (ngoài khung flexible)
   - Vào muộn: 5p (sau 8:30), Làm thực tế: 7h57p (8h57p - 1h nghỉ trưa), Ra muộn: 2p → **Thiếu 5p** ❌
 
-### 🟢 Quy tắc tính THỪA GIỜ (Overtime)
+### 🟢 Quy tắc tính THỪA GIỜ (Làm bù)
 
 #### 1. Ca sáng (vào và ra trước 13:00)
 - **Điều kiện:** Thời gian vào < 13:00 VÀ thời gian ra < 13:00
@@ -102,145 +111,40 @@ if (thoiGianVao < 13:00 && thoiGianRa < 13:00) {
   - Ra lúc 18:15 → 45 phút → **TÍNH 45 phút**
   - Ra lúc 18:20 → 50 phút → **TÍNH 45 phút** (làm tròn xuống 15p)
 
-### 🧮 Công thức tính toán
-
-#### Hàm tính thời gian làm thực tế:
-```javascript
-function tinhThoiGianLamThucTe(thoiGianVao, thoiGianRa, loaiCa) {
-    let thoiGianLam = thoiGianRa - thoiGianVao;
-    
-    // Ca sáng: chỉ tính đến trước 12:00
-    if (loaiCa.includes('Ca sáng')) {
-        const sangKetThuc = 12 * 60; // 12:00
-        if (thoiGianRa > sangKetThuc) {
-            // Nếu ra sau 12:00, chỉ tính đến 12:00
-            thoiGianLam = sangKetThuc - thoiGianVao;
-        }
-    }
-    // Ca chiều: chỉ tính từ 13:00 trở đi
-    else if (loaiCa.includes('Ca chiều')) {
-        const chieuBatDau = 13 * 60; // 13:00
-        if (thoiGianVao < chieuBatDau) {
-            // Nếu vào trước 13:00, chỉ tính từ 13:00
-            thoiGianLam = thoiGianRa - chieuBatDau;
-        }
-    }
-    // Ca toàn thời gian: trừ thời gian nghỉ trưa (12:00-13:00)
-    else {
-        const nghiTruaBatDau = 12 * 60; // 12:00
-        const nghiTruaKetThuc = 13 * 60; // 13:00
-        
-        // Chỉ trừ nghỉ trưa nếu làm việc qua khung 12:00-13:00
-        if (thoiGianVao < nghiTruaKetThuc && thoiGianRa > nghiTruaBatDau) {
-            const batDauNghiTrua = Math.max(thoiGianVao, nghiTruaBatDau);
-            const ketThucNghiTrua = Math.min(thoiGianRa, nghiTruaKetThuc);
-            const thoiGianNghiTrua = ketThucNghiTrua - batDauNghiTrua;
-            thoiGianLam -= thoiGianNghiTrua;
-        }
-    }
-    
-    return Math.max(0, thoiGianLam);
-}
-```
-
-#### Hàm tính thiếu giờ (deprecated):
-```javascript
-function calculateWorkingTime(timeIn, timeOut, shiftType) {
-    // ⚠️ HÀM NÀY ĐÃ ĐƯỢC THAY THẾ bằng tinhThoiGianLamThucTe() ở trên
-    // Logic cũ không phân biệt ca sáng đúng cách
-    // Logic mới phân biệt rõ ràng 3 loại ca:
-    // - Ca sáng: chỉ tính đến 12:00 (không tính nghỉ trưa)
-    // - Ca chiều: chỉ tính từ 13:00 (không tính time trước đó)
-    // - Ca toàn: trừ nghỉ trưa 12:00-13:00
-}
-
-function calculateLatePenalty(timeIn, shiftType) {
-    const earlyPenaltyThreshold = 7 * 60 + 30; // 07:30
-    
-    if (timeIn < earlyPenaltyThreshold) {
-        return { type: "early_penalty", minutes: 30 };
-    }
-    
-    // Flexible time ranges
-    let flexStart, flexEnd;
-    if (shiftType === 'Ca sáng') {
-        flexStart = 7 * 60 + 30; flexEnd = 8 * 60; // 07:30-08:00
-    } else if (shiftType === 'Ca chiều') {
-        flexStart = 13 * 60; flexEnd = 13 * 60 + 30; // 13:00-13:30
-    } else { // Ca toàn thời gian
-        flexStart = 7 * 60 + 30; flexEnd = 8 * 60 + 30; // 07:30-08:30
-    }
-    
-    if (timeIn > flexEnd) {
-        const lateMinutes = timeIn - flexEnd;
-        return { type: "late", minutes: lateMinutes };
-    }
-    
-    return { type: "normal", minutes: 0 };
-}
-```
-
-#### Hàm tính thừa giờ:
-```javascript
-function calculateOvertime(timeIn, timeOut, loaiCa) {
-    let standardEnd;
-    
-    if (loaiCa.includes('Ca sáng')) {
-        standardEnd = "12:30"; // Ca sáng ra chuẩn 12:30
-    } else if (loaiCa.includes('Ca chiều')) {
-        standardEnd = "17:00"; // Ca chiều ra chuẩn 17:00
-    } else {
-        standardEnd = "17:30"; // Ca toàn thời gian ra chuẩn 17:30
-    }
-    
-    if (timeOut > standardEnd) {
-        const overtimeMinutes = calculateMinutesDiff(standardEnd, timeOut);
-        
-        // CHỈ TÍNH KHI >= 30 PHÚT
-        if (overtimeMinutes >= 30) {
-            // Làm tròn xuống 15 phút
-            return Math.floor(overtimeMinutes / 15) * 15;
-        }
-    }
-    
-    return 0;
-}
-```
-
 ### 📊 Ví dụ tính toán thực tế
 
 #### Trường hợp 1: Ca sáng
 - **Vào:** 08:45 (muộn 15 phút so với 08:30)
-- **Ra:** 12:45 (thừa 15 phút so với 12:30)
+- **Ra:** 12:45 (làm bù 15 phút so với 12:30)
 - **Thực tế:** 4h = 4h (đủ)
-- **Kết quả:** Vào muộn 15p, Thừa 15p < 30p → **Thiếu 15 phút** ❌
+- **Kết quả:** Vào muộn 15p, Làm bù 15p < 30p → **Thiếu 15 phút** ❌
 
 #### Trường hợp 1b: Ca sáng cân bằng
 - **Vào:** 09:00 (muộn 30 phút so với 08:30)
-- **Ra:** 13:00 (thừa 30 phút >= 30p so với 12:30)
-- **Kết quả:** Thiếu 30p, Thừa 30p → **Cân bằng** ✅
+- **Ra:** 13:00 (làm bù 30 phút >= 30p so với 12:30)
+- **Kết quả:** Thiếu 30p, Làm bù 30p → **Cân bằng** ✅
 
 #### Trường hợp 2: Ca chiều
 - **Vào:** 13:00 (ca chiều)
 - **Ra:** 17:20 (thừa 20 phút → **KHÔNG TÍNH** vì < 30p)
-- **Kết quả:** 0 phút thừa
+- **Kết quả:** 0 phút làm bù
 
-#### Trường hợp 2b: Ca chiều có overtime
+#### Trường hợp 2b: Ca chiều có làm bù
 - **Vào:** 13:00 (ca chiều)  
-- **Ra:** 17:30 (thừa 30 phút → **TÍNH 30 phút**)
-- **Kết quả:** Thừa 30 phút
+- **Ra:** 17:30 (làm bù 30 phút → **TÍNH 30 phút**)
+- **Kết quả:** Làm bù 30 phút
 
 #### Trường hợp 3: Ca toàn thời gian vào muộn
 - **Vào:** 08:45 (muộn 15 phút)
-- **Ra:** 17:45 (thừa 15 phút)
+- **Ra:** 17:45 (làm bù 15 phút)
 - **Thực tế:** 9h - 1h nghỉ trưa = 8h = 8h (đủ)
-- **Kết quả:** Vào muộn 15p, Thừa 15p < 30p → **Thiếu 15 phút** ❌
+- **Kết quả:** Vào muộn 15p, Làm bù 15p < 30p → **Thiếu 15 phút** ❌
 
 #### Trường hợp 3b: Ca toàn thời gian cân bằng
 - **Vào:** 09:00 (muộn 30 phút)
-- **Ra:** 18:00 (thừa 30 phút >= 30p)
+- **Ra:** 18:00 (làm bù 30 phút >= 30p)
 - **Thực tế:** 9h - 1h nghỉ trưa = 8h (đủ 8h yêu cầu)
-- **Kết quả:** Thiếu 30p, Thừa 30p → **Cân bằng** ✅
+- **Kết quả:** Thiếu 30p, Làm bù 30p → **Cân bằng** ✅
 
 #### Trường hợp 3c: Ca toàn thời gian tính nghỉ trưa
 - **Vào:** 08:30 (đúng giờ)
@@ -259,11 +163,11 @@ function calculateOvertime(timeIn, timeOut, loaiCa) {
 Thời gian làm việc thực tế (ca toàn thời gian) = Giờ ra - Giờ vào - 1h nghỉ trưa (12:00-13:00)
 
 Tổng thiếu = Late Minutes + Early Penalty + Ra sớm + Thiếu giờ làm việc
-Tổng thừa = Overtime Minutes (CHỈ TÍNH KHI >= 30 PHÚT, rounded down to 15min)
-Phút còn thiếu = Tổng thiếu - Tổng thừa
+Tổng làm bù = Làm bù Minutes (CHỈ TÍNH KHI >= ngưỡng cấu hình, làm tròn xuống theo cấu hình)
+Phút còn thiếu = Tổng thiếu - Tổng làm bù
 
 Nếu Phút còn thiếu > 0: Còn thiếu
-Nếu Phút còn thiếu <= 0: Đã đủ/thừa
+Nếu Phút còn thiếu <= 0: Đã đủ/làm bù
 ```
 
 ### ⚠️ Lưu ý quan trọng về cách tính thời gian làm thực tế
@@ -300,10 +204,10 @@ Nếu Phút còn thiếu <= 0: Đã đủ/thừa
 #### Thông tin tổng quan:
 - **Ngày làm việc**: Tổng số ngày làm việc
 - **Phút thiếu**: Tổng phút thiếu (vào muộn + penalty + ra sớm)
-- **Phút thừa**: Tổng phút thừa (overtime >= 30p, làm tròn xuống 15p)
+- **Phút làm bù**: Tổng phút làm bù (>= ngưỡng cấu hình, làm tròn xuống theo cấu hình)
 - **Kết quả cuối**: 
   - ⚠️ **Còn thiếu**: X phút/giờ (màu đỏ) nếu còn thiếu > 0
-  - ✅ **Đã đủ/thừa**: X phút/giờ (màu xanh) nếu còn thiếu <= 0
+  - ✅ **Đã đủ/làm bù**: X phút/giờ (màu xanh) nếu còn thiếu <= 0
 
 #### Tự động phân tích:
 1. **Tìm thấy bảng Terra** → Tự động phân tích ngay lập tức
@@ -315,12 +219,75 @@ Nếu Phút còn thiếu <= 0: Đã đủ/thừa
 - **Loại ca**: Ca sáng/Ca chiều/Ca toàn thời gian/Nửa ngày
 - **Vào/Ra**: Thời gian thực tế
 - **Thiếu (p)**: Phút thiếu trong ngày (màu đỏ nếu > 0)
-- **Thừa (p)**: Phút thừa trong ngày (màu xanh nếu > 0)
+- **Làm bù (p)**: Phút làm bù trong ngày (màu xanh nếu > 0)
 - **Ghi chú**: Chi tiết tính toán (vào muộn, ra sớm, penalty...)
 
 ### ⚠️ Lưu ý quan trọng
-- **Overtime < 30 phút**: KHÔNG được tính vào tổng thừa
-- **Overtime >= 30 phút**: Được tính và làm tròn xuống 15 phút
-- **Ví dụ làm tròn xuống**: 35p → 30p, 50p → 45p, 74p → 60p
+- **Làm bù < ngưỡng tối thiểu**: KHÔNG được tính vào tổng làm bù (theo cấu hình)
+- **Làm bù >= ngưỡng tối thiểu**: Được tính và làm tròn xuống theo khoảng đã cấu hình
+- **Ví dụ làm tròn xuống** (với cấu hình mặc định 15p): 35p → 30p, 50p → 45p, 74p → 60p
 - **⚠️ Nghỉ trưa**: Khoảng 12:00-13:00 KHÔNG tính vào giờ làm việc cho ca toàn thời gian
-- **Tính thời gian thực tế**: Ca toàn thời gian tự động trừ 1h nghỉ trưa khi kiểm tra đủ 8h yêu cầu
+- **Tính thời gian thực tế**: Ca toàn thời gian tự động trừ 1h nghỉ trưa khi kiểm tra đủ giờ yêu cầu
+
+## ⚙️ HƯỚNG DẪN CẤU HÌNH
+
+### 🔧 Truy cập cấu hình
+1. Mở extension Terra Time Calculator
+2. Click nút **"⚙️ Cấu hình"** 
+3. Điều chỉnh các tham số theo nhu cầu
+4. Click **"💾 Lưu"** để áp dụng
+
+### 📊 Các tham số cấu hình
+
+#### 🕐 Giờ làm việc ca đầy đủ
+- **Phạm vi:** 4.0 - 12.0 giờ
+- **Mặc định:** 8.0 giờ (480 phút)
+- **Ảnh hưởng:** 
+  - Ca toàn thời gian sẽ yêu cầu số giờ này
+  - Ca nửa ngày tự động = giá trị này ÷ 2
+  - Giờ kết thúc dự kiến được tính dựa trên giá trị này
+
+#### ⏰ Làm bù tối thiểu
+- **Phạm vi:** 1 - 120 phút
+- **Mặc định:** 30 phút
+- **Ảnh hưởng:**
+  - Chỉ tính làm bù khi làm thêm >= giá trị này
+  - Nếu < giá trị này → không tính làm bù
+  - Ví dụ: Cấu hình 45p → chỉ tính làm bù từ 45p trở lên
+
+#### 🔄 Khoảng làm tròn làm bù  
+- **Phạm vi:** 1 - 60 phút
+- **Mặc định:** 15 phút
+- **Ảnh hưởng:**
+  - Làm bù sẽ được làm tròn xuống theo khoảng này
+  - Ví dụ với 15p: 47p → 45p, 62p → 60p
+  - Ví dụ với 30p: 47p → 30p, 62p → 60p
+
+### 💡 Ví dụ cấu hình tùy chỉnh
+
+#### Cấu hình công ty A (linh hoạt)
+```
+Giờ làm ca đầy đủ: 7.5 giờ
+Làm bù tối thiểu: 15 phút  
+Khoảng làm tròn: 5 phút
+```
+→ Ca toàn thời gian: 7.5h, Ca nửa ngày: 3.75h, Làm bù từ 15p, làm tròn 5p
+
+#### Cấu hình công ty B (nghiêm ngặt)
+```
+Giờ làm ca đầy đủ: 8.5 giờ
+Làm bù tối thiểu: 60 phút
+Khoảng làm tròn: 30 phút  
+```
+→ Ca toàn thời gian: 8.5h, Ca nửa ngày: 4.25h, Làm bù từ 1h, làm tròn 30p
+
+### 🔄 Reset cấu hình
+- Click **"🔄 Mặc định"** trong modal cấu hình
+- Khôi phục về giá trị mặc định: 8h, 30p, 15p
+- Không mất dữ liệu phân tích đã có
+
+### 💾 Lưu trữ cấu hình
+- Cấu hình được lưu trong localStorage của trình duyệt
+- Tự động khôi phục khi mở extension
+- Riêng biệt cho từng trình duyệt/profile
+- Không đồng bộ giữa các thiết bị
