@@ -803,6 +803,177 @@ if (window.terraTimeAnalyzerInjected) {
             }
         }
 
+        // === DATE & WEEK UTILITIES ===
+        
+        parseDateFromString(dateText) {
+            if (!dateText) return null;
+
+            const match = dateText.trim().match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
+            if (!match) return null;
+
+            const day = parseInt(match[1], 10);
+            const month = parseInt(match[2], 10);
+            const year = this.inferYear(month, match[3]);
+
+            return this.createValidatedDate(year, month, day);
+        }
+
+        inferYear(month, yearString) {
+            if (yearString) {
+                const year = parseInt(yearString, 10);
+                return yearString.length === 2 
+                    ? (year >= 50 ? 1900 + year : 2000 + year)
+                    : year;
+            }
+
+            // Auto-detect year for cross-year weeks
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+
+            if (month === 12 && currentMonth === 0) return currentYear - 1;
+            if (month === 1 && currentMonth === 11) return currentYear + 1;
+            
+            return currentYear;
+        }
+
+        createValidatedDate(year, month, day) {
+            const date = new Date(year, month - 1, day);
+            
+            if (Number.isNaN(date.getTime())) return null;
+            
+            // Validate date components (e.g., prevent 31/02 becoming 03/03)
+            const isValid = date.getFullYear() === year 
+                && date.getMonth() === month - 1 
+                && date.getDate() === day;
+            
+            if (!isValid) return null;
+
+            date.setHours(0, 0, 0, 0);
+            return date;
+        }
+
+        formatDateForDisplay(date) {
+            if (!date) return '';
+            
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            
+            return `${day}/${month}`;
+        }
+
+        getWeekInfo(date) {
+            if (!date) return null;
+
+            const weekStart = this.getMonday(date);
+            const weekEnd = this.getWeekEnd(weekStart);
+            
+            return {
+                key: this.formatWeekKey(weekStart),
+                label: `${this.formatDateForDisplay(weekStart)} - ${this.formatDateForDisplay(weekEnd)}`,
+                start: weekStart,
+                end: weekEnd
+            };
+        }
+
+        getMonday(date) {
+            const monday = new Date(date);
+            const dayOffset = (monday.getDay() + 6) % 7; // 0 = Monday, 6 = Sunday
+            monday.setDate(monday.getDate() - dayOffset);
+            monday.setHours(0, 0, 0, 0);
+            return monday;
+        }
+
+        getWeekEnd(weekStart) {
+            const sunday = new Date(weekStart);
+            sunday.setDate(weekStart.getDate() + 6);
+            return sunday;
+        }
+
+        formatWeekKey(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        groupDetailsByWeek(dayDetails) {
+            const groupsMap = this.createWeekGroups(dayDetails);
+            const groups = Array.from(groupsMap.values());
+            return this.sortWeekGroups(groups);
+        }
+
+        createWeekGroups(dayDetails) {
+            const groupsMap = new Map();
+
+            dayDetails.forEach(detail => {
+                const weekInfo = this.getWeekInfoForDetail(detail);
+                const groupKey = weekInfo.key;
+
+                if (!groupsMap.has(groupKey)) {
+                    groupsMap.set(groupKey, this.createEmptyWeekGroup(weekInfo));
+                }
+
+                this.addDetailToGroup(groupsMap.get(groupKey), detail);
+            });
+
+            return groupsMap;
+        }
+
+        getWeekInfoForDetail(detail) {
+            const parsedDate = this.parseDateFromString(detail.ngay);
+            
+            if (parsedDate) {
+                const weekInfo = this.getWeekInfo(parsedDate);
+                return {
+                    key: `week-${weekInfo.key}`,
+                    label: weekInfo.label,
+                    start: weekInfo.start,
+                    end: weekInfo.end
+                };
+            }
+
+            // Fallback for unparseable dates
+            return {
+                key: `unknown-${detail.ngay}`,
+                label: `Tuần ${detail.ngay}`,
+                start: null,
+                end: null
+            };
+        }
+
+        createEmptyWeekGroup(weekInfo) {
+            return {
+                key: weekInfo.key,
+                label: weekInfo.label,
+                start: weekInfo.start,
+                end: weekInfo.end,
+                rows: [],
+                totalDeficit: 0,
+                totalLamBu: 0
+            };
+        }
+
+        addDetailToGroup(group, detail) {
+            group.rows.push(detail);
+            group.totalDeficit += detail.phutThieu || 0;
+            group.totalLamBu += detail.phutThua || 0;
+        }
+
+        sortWeekGroups(groups) {
+            return groups.sort((a, b) => {
+                // Both have valid dates
+                if (a.start && b.start) return a.start - b.start;
+                
+                // Valid dates come before invalid ones
+                if (a.start) return -1;
+                if (b.start) return 1;
+                
+                // Both invalid, maintain order
+                return 0;
+            });
+        }
+
         showDetailedResults(analysis) {
             // Tạo modal chi tiết
             const modal = document.createElement('div');
@@ -821,70 +992,100 @@ if (window.terraTimeAnalyzerInjected) {
                 <table class="terra-detail-table">
                     <thead class="terra-table-header-sticky">
                         <tr>
+                            <th>Tuần</th>
                             <th>Ngày</th>
                             <th>Loại ca</th>
                             <th>Vào</th>
                             <th>Ra</th>
                             <th>Thiếu (p)</th>
-                            <th>Thừa (p)</th>
+                            <th>Làm bù (p)</th>
                         </tr>
                     </thead>
                     <tbody>
         `;
 
             if (analysis.chiTietNgay && analysis.chiTietNgay.length > 0) {
-                analysis.chiTietNgay.forEach(ngay => {
-                    const thieuClass = ngay.phutThieu > 0 ? 'terra-text-danger' : '';
+                const weeklyGroups = this.groupDetailsByWeek(analysis.chiTietNgay);
 
-                    // Tạo text cho cột thừa giờ với khoảng thời gian
-                    let thuaText = '-';
-                    if (ngay.phutThua > 0) {
-                        // Sử dụng method calculateExpectedEndTime để tái sử dụng logic
-                        const expectedEndTime = this.calculateExpectedEndTime(ngay.thoiGianVao, ngay.loaiCa);
-                        const gioRaChuan = this.minutesToTime(expectedEndTime);
-                        const gioRaThucTe = this.minutesToTime(ngay.thoiGianRa);
-                        thuaText = `<span class="terra-text-success">${ngay.phutThua}</span> (${gioRaChuan}-${gioRaThucTe})`;
-                    }
+                weeklyGroups.forEach((group, groupIndex) => {
+                    group.rows.forEach((ngay, index) => {
+                        const thieuClass = ngay.phutThieu > 0 ? 'terra-text-danger' : '';
 
-                    // Class CSS cho loại ca
-                    const loaiCaClass = (ngay.loaiCa === 'Sáng' || ngay.loaiCa === 'Chiều') ? 'terra-text-warning' : '';
-
-                    // Detect vào muộn và ra sớm để highlight
-                    let gioVaoText = ngay.thoiGianVao ? this.minutesToTime(ngay.thoiGianVao) : '-';
-                    let gioRaText = ngay.thoiGianRa ? this.minutesToTime(ngay.thoiGianRa) : '-';
-
-                    if (ngay.thoiGianVao && ngay.thoiGianRa) {
-                        // Sử dụng helper methods để get flexible range và expected end time
-                        const flexRange = this.getFlexibleRange(ngay.loaiCa);
-                        const expectedEndTime = this.calculateExpectedEndTime(ngay.thoiGianVao, ngay.loaiCa);
-
-                        // Highlight vào muộn
-                        if (ngay.thoiGianVao > flexRange.end) {
-                            gioVaoText = `<span class="terra-text-underline">${gioVaoText}</span>`;
+                        let lamBuText = '-';
+                        if (ngay.phutThua > 0) {
+                            const expectedEndTime = this.calculateExpectedEndTime(ngay.thoiGianVao, ngay.loaiCa);
+                            const gioRaChuan = this.minutesToTime(expectedEndTime);
+                            const gioRaThucTe = this.minutesToTime(ngay.thoiGianRa);
+                            lamBuText = `<span class="terra-text-success">${ngay.phutThua}</span> (${gioRaChuan}-${gioRaThucTe})`;
                         }
 
-                        // Highlight ra sớm
-                        if (ngay.thoiGianRa < expectedEndTime) {
-                            gioRaText = `<span class="terra-text-underline">${gioRaText}</span>`;
-                        }
-                    }
+                        const loaiCaClass = (ngay.loaiCa === 'Sáng' || ngay.loaiCa === 'Chiều') ? 'terra-text-warning' : '';
 
-                    tableHTML += `
-                    <tr>
-                        <td>${ngay.ngay}</td>
-                        <td><small class="${loaiCaClass}">${ngay.loaiCa}</small></td>
-                        <td>${gioVaoText}</td>
-                        <td>${gioRaText}</td>
-                        <td class="${thieuClass}">${ngay.phutThieu || '-'}</td>
-                        <td>${thuaText}</td>
-                    </tr>
-                `;
+                        let gioVaoText = ngay.thoiGianVao ? this.minutesToTime(ngay.thoiGianVao) : '-';
+                        let gioRaText = ngay.thoiGianRa ? this.minutesToTime(ngay.thoiGianRa) : '-';
+
+                        if (ngay.thoiGianVao && ngay.thoiGianRa) {
+                            const flexRange = this.getFlexibleRange(ngay.loaiCa);
+                            const expectedEndTime = this.calculateExpectedEndTime(ngay.thoiGianVao, ngay.loaiCa);
+
+                            if (ngay.thoiGianVao > flexRange.end) {
+                                gioVaoText = `<span class="terra-text-underline">${gioVaoText}</span>`;
+                            }
+
+                            if (ngay.thoiGianRa < expectedEndTime) {
+                                gioRaText = `<span class="terra-text-underline">${gioRaText}</span>`;
+                            }
+                        }
+
+                        const netMinutes = group.totalDeficit - group.totalLamBu;
+                        let netLabel, netClass;
+                        if (netMinutes > 0) {
+                            netLabel = `-${netMinutes}p`;
+                            netClass = 'terra-week-net-negative';
+                        } else if (netMinutes < 0) {
+                            netLabel = `+${Math.abs(netMinutes)}p`;
+                            netClass = 'terra-week-net-positive';
+                        }
+
+                        const weekCell = index === 0
+                            ? `<td class="terra-week-cell" rowspan="${group.rows.length}">
+                                    <div class="terra-week-label">${group.label}</div>
+                                    ${(group.totalDeficit === 0 && group.totalLamBu === 0) ? '' : `
+                                    <div class="terra-week-summary">
+                                        <div class="terra-week-left">
+                                            <span class="terra-week-deficit">Thiếu: ${group.totalDeficit}p</span>
+                                            <span class="terra-week-surplus">Dư: ${group.totalLamBu}p</span>
+                                        </div>
+                                        <div class="terra-week-net-divider"></div>
+                                        <div class="terra-week-net ${netClass}">${netLabel}</div>
+                                    </div>`}
+                                </td>`
+                            : '';
+
+                        const isLastWeek = groupIndex === weeklyGroups.length - 1;
+                        const rowClass = index === 0
+                            ? (groupIndex === 0 ? 'terra-week-start-first' : 'terra-week-start-row')
+                            : (index === group.rows.length - 1 && !isLastWeek ? 'terra-week-end-row' : '');
+
+                        tableHTML += `
+                        <tr${rowClass ? ` class="${rowClass}"` : ''}>
+                            ${weekCell}
+                            <td>${ngay.ngay}</td>
+                            <td><small class="${loaiCaClass}">${ngay.loaiCa}</small></td>
+                            <td>${gioVaoText}</td>
+                            <td>${gioRaText}</td>
+                            <td class="${thieuClass}">${ngay.phutThieu || '-'}</td>
+                            <td>${lamBuText}</td>
+                        </tr>
+                    `;
+                    });
                 });
             } else {
                 // Fallback: hiển thị dữ liệu gốc
                 analysis.data.forEach(row => {
                     tableHTML += `
                     <tr>
+                        <td>-</td>
                         <td>${row.ngay}</td>
                         <td>${row.phanLoai}</td>
                         <td>${row.thucTeVao}</td>
@@ -895,6 +1096,24 @@ if (window.terraTimeAnalyzerInjected) {
                 `;
                 });
             }
+
+            const totalNetMinutes = analysis.tongPhutThieu - analysis.tongPhutThua;
+            let totalNetLabel, totalNetClass;
+            if (totalNetMinutes > 0) {
+                totalNetLabel = `-${totalNetMinutes}p`;
+                totalNetClass = 'terra-week-net-negative';
+            } else if (totalNetMinutes < 0) {
+                totalNetLabel = `+${Math.abs(totalNetMinutes)}p`;
+                totalNetClass = 'terra-week-net-positive';
+            }
+
+            tableHTML += `
+                    <tr class="terra-total-row">
+                        <td colspan="5"><strong>Tổng <span class="terra-week-net ${totalNetClass}">(${totalNetLabel})</span></strong></td>
+                        <td class="terra-text-danger"><strong>${analysis.tongPhutThieu}</strong></td>
+                        <td><strong class="terra-text-success">${analysis.tongPhutThua}</strong></td>
+                    </tr>
+            `;
 
             tableHTML += `
                     </tbody>

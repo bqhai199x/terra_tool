@@ -50,7 +50,7 @@
     background: white !important;
     padding: 30px !important;
     border-radius: 16px !important;
-    max-width: 700px !important;
+    max-width: 800px !important;
     width: 95% !important;
     max-height: 85% !important;
     overflow-y: auto !important;
@@ -202,6 +202,109 @@
 
 .terra-detail-table tr:hover {
     background: #f8f9fa !important;
+}
+
+.terra-week-cell {
+    min-width: 160px !important;
+    background: #f5f7fb !important;
+    border-right: 1px solid #dce3f2 !important;
+    vertical-align: top !important;
+}
+
+.terra-week-label {
+    font-weight: 600 !important;
+    color: #1a237e !important;
+    margin-bottom: 6px !important;
+    display: block !important;
+}
+
+.terra-week-summary {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-size: 12px !important;
+}
+
+.terra-week-left {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    justify-content: center !important;
+    flex: 1 !important;
+}
+
+.terra-week-summary span {
+    display: block !important;
+    white-space: nowrap !important;
+}
+
+.terra-week-net-divider {
+    width: 1px !important;
+    align-self: stretch !important;
+    background: #9fb7f4 !important;
+    flex-shrink: 0 !important;
+}
+
+.terra-week-deficit {
+    color: #c62828 !important;
+    font-weight: 600 !important;
+}
+
+.terra-week-surplus {
+    color: #2e7d32 !important;
+    font-weight: 600 !important;
+}
+
+.terra-week-summary .terra-week-net {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    padding: 4px !important;
+    border-radius: 4px !important;
+}
+
+.terra-week-net {
+    background: rgba(0, 0, 0, 0.05) !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    padding: 4px !important;
+    border-radius: 4px !important;
+}
+
+.terra-week-net-negative {
+    font-weight: bold !important;
+    color: #b71c1c !important;
+}
+
+.terra-week-net-positive {
+    font-weight: bold !important;
+    color: #1b5e20 !important;
+}
+
+.terra-week-start-row td {
+    border-top: 2px solid #9fb7f4 !important;
+}
+
+.terra-week-start-first td {
+    border-top: none !important;
+}
+
+.terra-total-row {
+    background: #eef5ff !important;
+    font-weight: 600 !important;
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 2 !important;
+    box-shadow: 0 -1px 0 0 #9fb7f4 !important;
+}
+
+.terra-total-row td {
+    border-top: none !important;
+    border-bottom: none !important;
 }
 
 /* Loading spinner */

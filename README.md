@@ -7,7 +7,8 @@
 - ✅ Phân tích bảng chấm công Terra tự động
 - ⏱️ Tính toán thời gian làm việc dự kiến vs thực tế
 - 📊 Hiển thị thông tin thống kê chi tiết
-- 🔧 Logic tính toán thông minh theo quy tắc Terra chính xác
+- �️ **Nhóm theo tuần:** Tự động nhóm và tính tổng thiếu/dư/net theo từng tuần
+- �🔧 Logic tính toán thông minh theo quy tắc Terra chính xác
 - 🌟 Hỗ trợ nghỉ nửa ngày và các trường hợp đặc biệt
 - ⚙️ **Cấu hình linh hoạt:** Tùy chỉnh giờ làm việc và quy tắc làm bù
 
@@ -21,6 +22,7 @@
 
 ### 🎯 Hỗ trợ đa dạng
 - **Nghỉ nửa ngày:** Tự động phát hiện và tính toán chính xác
+- **Nhóm theo tuần:** Tự động nhóm dữ liệu theo tuần (Thứ 2 - Chủ nhật), hiển thị tổng thiếu/dư và net mỗi tuần
 - **Tìm bảng thông minh:** Nhiều pattern nhận diện bảng Terra
 - **Giao diện responsive:** Hoạt động mượt mà trên popup nhỏ
 - **URL validation:** Chỉ hoạt động trên trang Terra chính thức
@@ -86,6 +88,14 @@
 ### Bước 5: Xem chi tiết
 - Click **"📋 Xem chi tiết"** để xem bảng phân tích chi tiết
 - Bảng sẽ hiển thị thông tin từng ngày với thời gian vào/ra và tính toán thiếu/thừa
+- **Tính năng nhóm theo tuần:**
+  - Dữ liệu được tự động nhóm theo tuần (Thứ 2 - Chủ nhật)
+  - Mỗi tuần hiển thị:
+    - **Thiếu:** Tổng phút thiếu trong tuần
+    - **Dư:** Tổng phút làm bù trong tuần
+    - **Net:** Kết quả ròng (Thiếu - Dư)
+      - Đỏ: còn thiếu (âm)
+      - Xanh: đã đủ/thừa (dương)
 
 ## 🔧 Cấu trúc dự án
 
