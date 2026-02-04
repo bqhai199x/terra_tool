@@ -9,8 +9,8 @@
 - 📊 Hiển thị thông tin thống kê chi tiết
 - �️ **Nhóm theo tuần:** Tự động nhóm và tính tổng thiếu/dư/net theo từng tuần
 - �🔧 Logic tính toán thông minh theo quy tắc Terra chính xác
-- 🌟 Hỗ trợ nghỉ nửa ngày và các trường hợp đặc biệt
-- ⚙️ **Cấu hình linh hoạt:** Tùy chỉnh giờ làm việc và quy tắc làm bù
+- 🌟 Hỗ trợ nghỉ nửa ngày và các trường hợp đặc biệt- ⏰ **Hỗ trợ làm bù:** Tự động tính và hiển thị giờ làm bù
+- 🏖️ **Theo dõi nghỉ phép:** Thống kê số ngày nghỉ phép năm, nghỉ lễ- ⚙️ **Cấu hình linh hoạt:** Tùy chỉnh giờ làm việc và quy tắc làm bù
 
 ## ✨ Tính năng nổi bật
 
@@ -74,9 +74,11 @@
 
 ### Bước 3: Xem kết quả
 - **Số ngày làm việc:** Tổng số ngày đã làm việc (bao gồm nghỉ nửa ngày)
+- **Nghỉ phép:** Số ngày nghỉ phép năm, nghỉ lễ
 - **Phút thiếu:** Tổng số phút thiếu do vào muộn, ra sớm
 - **Phút làm bù:** Tổng số phút làm bù (tùy theo cấu hình)
-- **Kết quả:** Thời gian cần bù thêm hoặc đã đủ/thừa
+- **Giờ làm bù:** Tổng giờ làm bù được tính từ các dòng "Làm bù"
+- **Kết quả:** Thời gian cần bù thêm hoặc đã đủ/thừa (sau khi trừ cả giờ làm bù)
 
 ### Bước 4: Cấu hình (tùy chọn)
 - Click **"⚙️ Cấu hình"** để tùy chỉnh:
@@ -96,6 +98,10 @@
     - **Net:** Kết quả ròng (Thiếu - Dư)
       - Đỏ: còn thiếu (âm)
       - Xanh: đã đủ/thừa (dương)
+- **Hiển thị đặc biệt:**
+  - Dòng "Làm bù" được đánh dấu màu xanh dương với giờ làm bù (+0.5h, +1h, etc.)
+  - Dòng "Nghỉ phép" được đánh dấu màu cam
+  - Dòng "Đi làm" bình thường hiển thị thời gian vào/ra và tính toán thiếu/thừa
 
 ## 🔧 Cấu trúc dự án
 

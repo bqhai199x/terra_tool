@@ -50,7 +50,7 @@
     background: white !important;
     padding: 30px !important;
     border-radius: 16px !important;
-    max-width: 800px !important;
+    max-width: 1000px !important;
     width: 95% !important;
     max-height: 85% !important;
     overflow-y: auto !important;
@@ -379,6 +379,11 @@
 
 .terra-text-warning {
     color: #f57c00 !important;
+    font-weight: bold !important;
+}
+
+.terra-text-info {
+    color: #0288d1 !important;
     font-weight: bold !important;
 }
 

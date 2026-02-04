@@ -511,6 +511,7 @@ if (window.terraTimeAnalyzerInjected) {
         processDataRows(rows) {
             const data = [];
             let currentDate = null; // Theo dõi ngày hiện tại
+            const pendingData = []; // Lưu tạm dữ liệu làm bù và nghỉ phép chưa merge
 
             rows.forEach((row, index) => {
                 const rowData = this.extractRowData(row, currentDate);
@@ -522,8 +523,45 @@ if (window.terraTimeAnalyzerInjected) {
                     }
 
                     // Chỉ thêm hàng "Đi làm" có ngày hợp lệ
+                    // Làm bù và nghỉ phép sẽ được merge vào dòng đi làm cùng ngày
                     if (this.isWorkRow(rowData)) {
+                        // Merge pending data (compensation/leave) từ cùng ngày
+                        const pendingForThisDay = pendingData.filter(p => p.ngay === rowData.ngay);
+                        pendingForThisDay.forEach(pendingItem => {
+                            if (pendingItem.type === 'compensation') {
+                                rowData.gioLamBu = pendingItem.gioLam;
+                                rowData.duKienVaoLamBu = pendingItem.duKienVao;
+                                rowData.duKienRaLamBu = pendingItem.duKienRa;
+                            } else if (pendingItem.type === 'leave') {
+                                rowData.noteNghiPhep = pendingItem.phanLoai;
+                                rowData.gioLam = pendingItem.gioLam; // Số giờ nghỉ
+                            }
+                        });
+                        // Xóa pending data đã merge
+                        pendingData.splice(0, pendingData.length, ...pendingData.filter(p => p.ngay !== rowData.ngay));
+                        
                         data.push(rowData);
+                    } else if (this.isCompensationRow(rowData)) {
+                        // Tìm dòng đi làm cùng ngày và merge thông tin làm bù vào
+                        const workRowSameDay = data.find(d => d.ngay === rowData.ngay && this.isWorkRow(d));
+                        if (workRowSameDay) {
+                            workRowSameDay.gioLamBu = rowData.gioLam;
+                            workRowSameDay.duKienVaoLamBu = rowData.duKienVao;
+                            workRowSameDay.duKienRaLamBu = rowData.duKienRa;
+                        } else {
+                            // Chưa có dòng work, lưu tạm
+                            pendingData.push({ ...rowData, type: 'compensation' });
+                        }
+                    } else if (this.isLeaveRow(rowData)) {
+                        // Tìm dòng đi làm cùng ngày và merge thông tin nghỉ phép vào
+                        const workRowSameDay = data.find(d => d.ngay === rowData.ngay && this.isWorkRow(d));
+                        if (workRowSameDay) {
+                            workRowSameDay.noteNghiPhep = rowData.phanLoai;
+                            workRowSameDay.gioLam = rowData.gioLam; // Số giờ nghỉ
+                        } else {
+                            // Chưa có dòng work, lưu tạm
+                            pendingData.push({ ...rowData, type: 'leave' });
+                        }
                     }
                 }
             });
@@ -574,11 +612,33 @@ if (window.terraTimeAnalyzerInjected) {
             return hasValidDate && isWorkType;
         }
 
+        isCompensationRow(rowData) {
+            const isCompensation = rowData.phanLoai && rowData.phanLoai.toLowerCase().includes('làm bù');
+            return isCompensation;
+        }
+
+        isLeaveRow(rowData) {
+            // Chỉ tính nghỉ phép năm
+            const isAnnualLeave = rowData.phanLoai && 
+                rowData.phanLoai.toLowerCase().includes('nghỉ phép năm');
+            return isAnnualLeave;
+        }
+
         getCellText(cell) {
             if (!cell) return '';
 
             // Lấy text thường từ .cell hoặc trực tiếp từ element
             const cellDiv = cell.querySelector('.cell');
+            
+            // Ưu tiên lấy span không phải .text-muted (bỏ qua dự kiến trong ngoặc)
+            const nonMutedSpans = cellDiv ? cellDiv.querySelectorAll('span:not(.text-muted)') : cell.querySelectorAll('span:not(.text-muted)');
+            if (nonMutedSpans.length > 0) {
+                const firstSpanText = nonMutedSpans[0].textContent.trim();
+                if (firstSpanText) {
+                    return firstSpanText;
+                }
+            }
+            
             let text = cellDiv ? cellDiv.textContent.trim() : cell.textContent.trim();
 
             // Làm sạch text cho cột phân loại - ưu tiên lấy dòng "Đi làm"
@@ -623,13 +683,21 @@ if (window.terraTimeAnalyzerInjected) {
             const detailsByDay = [];
 
             data.forEach(row => {
-                // Data đã được lọc chỉ chứa dòng "Đi làm" từ processDataRows()
-                summary.workDays += 1;
-                const dayDetails = this.calculateDayDetails(row);
-                detailsByDay.push(dayDetails);
-
-                summary.totalDeficitMinutes += dayDetails.phutThieu;
-                summary.totalOvertimeMinutes += dayDetails.phutThua;
+                // Xử lý đi làm (có thể có làm bù và/hoặc nghỉ phép)
+                if (this.isWorkRow(row)) {
+                    // Đi làm bình thường
+                    summary.workDays += 1;
+                    const dayDetails = this.calculateDayDetails(row);
+                    detailsByDay.push(dayDetails);
+                    summary.totalDeficitMinutes += dayDetails.phutThieu;
+                    summary.totalOvertimeMinutes += dayDetails.phutThua;
+                    summary.totalCompensationMinutes += dayDetails.phutLamBu || 0;
+                    
+                    // Tính nghỉ phép nếu có (có thể nửa ngày)
+                    if (dayDetails.soNgayNghi > 0) {
+                        summary.leaveDays += dayDetails.soNgayNghi;
+                    }
+                }
             });
             return this.buildFinalResult(summary, detailsByDay, data);
         }
@@ -638,23 +706,27 @@ if (window.terraTimeAnalyzerInjected) {
             return {
                 workDays: 0,
                 totalDeficitMinutes: 0,
-                totalOvertimeMinutes: 0
+                totalOvertimeMinutes: 0,
+                totalCompensationMinutes: 0,
+                leaveDays: 0
             };
         }
 
         buildFinalResult(summary, detailsByDay, originalData) {
-            const netDeficitMinutes = summary.totalDeficitMinutes - summary.totalOvertimeMinutes;
+            const netDeficitMinutes = summary.totalDeficitMinutes - summary.totalOvertimeMinutes - summary.totalCompensationMinutes;
             const netDeficitHours = (netDeficitMinutes / 60).toFixed(2);
-            const dailyWorkHours = USER_CONFIG.WORK_HOURS.FULL_DAY / 60;
+            const dailyWorkHours = (USER_CONFIG.WORK_HOURS.FULL_DAY / 60).toFixed(2);
             const dailyWorkMinutes = USER_CONFIG.WORK_HOURS.FULL_DAY;
 
             const result = {
                 soNgayLamViec: summary.workDays,
                 tongPhutThieu: summary.totalDeficitMinutes,
-                tongPhutThua: summary.totalOvertimeMinutes,
+                tongPhutThua: summary.totalOvertimeMinutes, // Chỉ overtime, không cộng compensation
+                tongPhutLamBu: summary.totalCompensationMinutes,
+                soNgayNghiPhep: parseFloat(summary.leaveDays.toFixed(2)),
                 phutConThieu: netDeficitMinutes,
                 gioConThieu: netDeficitHours,
-                tongGioLamDuKien: (summary.workDays * dailyWorkHours).toFixed(2),
+                tongGioLamDuKien: (summary.workDays * parseFloat(dailyWorkHours)).toFixed(2),
                 tongGioLamThucTe: ((summary.workDays * dailyWorkMinutes - netDeficitMinutes) / 60).toFixed(2),
                 chiTietNgay: detailsByDay,
                 data: originalData
@@ -663,8 +735,44 @@ if (window.terraTimeAnalyzerInjected) {
             return result;
         }
 
+        calculateCompensationDetails(rowData) {
+            const { ngay, gioLam } = rowData;
+            
+            // Parse giờ làm bù từ cột "Giờ làm" - format: (+0.5), (+1), (+1.25)
+            let compensationMinutes = 0;
+            if (gioLam) {
+                const match = gioLam.match(/\(\+?([\d.]+)\)/);
+                if (match) {
+                    const hours = parseFloat(match[1]);
+                    compensationMinutes = Math.round(hours * 60);
+                }
+            }
+
+            return {
+                ngay,
+                loaiCa: 'Làm bù',
+                phutLamBu: compensationMinutes,
+                phutThieu: 0,
+                phutThua: 0
+            };
+        }
+
+        calculateLeaveDetails(rowData) {
+            const { ngay, phanLoai } = rowData;
+            
+            return {
+                ngay,
+                loaiCa: 'Nghỉ phép',
+                loaiNghi: phanLoai,
+                phutThieu: 0,
+                phutThua: 0,
+                phutLamBu: 0,
+                khungGioLamBu: ''
+            };
+        }
+
         calculateDayDetails(rowData) {
-            const { ngay, thucTeVao, thucTeRa } = rowData;
+            const { ngay, thucTeVao, thucTeRa, duKienVao, duKienRa } = rowData;
 
             // Xử lý trường hợp thiếu dữ liệu thời gian
             if (!this.hasValidTimeData(thucTeVao, thucTeRa)) {
@@ -673,11 +781,77 @@ if (window.terraTimeAnalyzerInjected) {
 
             const timeIn = this.timeToMinutes(thucTeVao);
             const timeOut = this.timeToMinutes(thucTeRa);
+            
+            // Parse nghỉ phép nếu có (xác định nghỉ nửa ngày)
+            let leaveDays = 0;
+            let leaveNote = '';
+            let leaveType = null; // 'morning' hoặc 'afternoon'
+            if (rowData.noteNghiPhep) {
+                leaveNote = rowData.noteNghiPhep;
+                
+                // Xác định nghỉ nửa ngày dựa vào khung giờ dự kiến
+                if (duKienVao && duKienRa) {
+                    const expectedIn = this.timeToMinutes(duKienVao);
+                    const expectedOut = this.timeToMinutes(duKienRa);
+                    
+                    // Nghỉ sáng: dự kiến 08:00-12:00 hoặc kết thúc trước 13:00
+                    if (expectedOut <= TIME_CONSTANTS.STANDARD_TIMES.AFTERNOON_START) {
+                        leaveType = 'morning';
+                        leaveDays = 0.5;
+                    }
+                    // Nghỉ chiều: dự kiến 13:00-17:00 hoặc bắt đầu từ 13:00
+                    else if (expectedIn >= TIME_CONSTANTS.STANDARD_TIMES.AFTERNOON_START) {
+                        leaveType = 'afternoon';
+                        leaveDays = 0.5;
+                    }
+                    // Nghỉ cả ngày: qua cả sáng và chiều
+                    else {
+                        leaveDays = 1;
+                    }
+                } else {
+                    // Fallback: parse từ cột "Giờ làm"
+                    if (rowData.gioLam) {
+                        const match = rowData.gioLam.match(/\(([\d.]+)\)/);
+                        if (match) {
+                            leaveDays = parseFloat(match[1]);
+                        } else {
+                            leaveDays = 1;
+                        }
+                    } else {
+                        leaveDays = 1;
+                    }
+                }
+            }
+            
             const shiftType = this.determineShiftType(timeIn, timeOut);
 
-            // Tính thiếu giờ và thừa giờ
-            const deficitMinutes = this.calculateDeficitMinutes(timeIn, timeOut, shiftType);
-            const overtimeMinutes = this.calculateOvertimeMinutes(timeIn, timeOut, shiftType);
+            // Tính thiếu giờ và thừa giờ (điều chỉnh nếu có nghỉ phép nửa ngày)
+            let deficitMinutes = this.calculateDeficitMinutes(timeIn, timeOut, shiftType);
+            let overtimeMinutes = this.calculateOvertimeMinutes(timeIn, timeOut, shiftType);
+            
+            // Điều chỉnh khi có nghỉ phép nửa ngày
+            if (leaveType === 'morning' && shiftType === SHIFT_TYPES.AFTERNOON) {
+                // Nghỉ sáng, làm chiều → không tính thiếu (đã nghỉ phép)
+                deficitMinutes = 0;
+            } else if (leaveType === 'afternoon' && shiftType === SHIFT_TYPES.MORNING) {
+                // Nghỉ chiều, làm sáng → không tính thiếu (đã nghỉ phép)
+                deficitMinutes = 0;
+            }
+
+            // Parse giờ làm bù nếu có (cho phép cả khi có nghỉ phép nửa ngày)
+            let compensationMinutes = 0;
+            let compensationTimeRange = '';
+            if (rowData.gioLamBu) {
+                const match = rowData.gioLamBu.match(/\(\+?([\d.]+)\)/);
+                if (match) {
+                    const hours = parseFloat(match[1]);
+                    compensationMinutes = Math.round(hours * 60);
+                    // Tạo khung giờ làm bù từ dự kiến vào/ra (với khoảng trắng)
+                    if (rowData.duKienVaoLamBu && rowData.duKienRaLamBu) {
+                        compensationTimeRange = `${rowData.duKienVaoLamBu} - ${rowData.duKienRaLamBu}`;
+                    }
+                }
+            }
 
             return {
                 ngay,
@@ -685,7 +859,12 @@ if (window.terraTimeAnalyzerInjected) {
                 thoiGianVao: timeIn,
                 thoiGianRa: timeOut,
                 phutThieu: deficitMinutes,
-                phutThua: overtimeMinutes
+                phutThua: overtimeMinutes,
+                phutLamBu: compensationMinutes,
+                khungGioLamBu: compensationTimeRange,
+                soNgayNghi: leaveDays,
+                noteNghiPhep: leaveNote,
+                leaveType: leaveType // 'morning', 'afternoon' hoặc null
             };
         }
 
@@ -698,7 +877,11 @@ if (window.terraTimeAnalyzerInjected) {
                 ngay,
                 loaiCa: 'Chưa xác định',
                 phutThieu: 0,
-                phutThua: 0
+                phutThua: 0,
+                phutLamBu: 0,
+                khungGioLamBu: '',
+                soNgayNghi: 0,
+                noteNghiPhep: ''
             };
         }
 
@@ -957,7 +1140,7 @@ if (window.terraTimeAnalyzerInjected) {
         addDetailToGroup(group, detail) {
             group.rows.push(detail);
             group.totalDeficit += detail.phutThieu || 0;
-            group.totalLamBu += detail.phutThua || 0;
+            group.totalLamBu += (detail.phutThua || 0) + (detail.phutLamBu || 0);
         }
 
         sortWeekGroups(groups) {
@@ -998,6 +1181,7 @@ if (window.terraTimeAnalyzerInjected) {
                             <th>Vào</th>
                             <th>Ra</th>
                             <th>Thiếu (p)</th>
+                            <th>Thừa (p)</th>
                             <th>Làm bù (p)</th>
                         </tr>
                     </thead>
@@ -1012,17 +1196,41 @@ if (window.terraTimeAnalyzerInjected) {
                         const thieuClass = ngay.phutThieu > 0 ? 'terra-text-danger' : '';
 
                         let lamBuText = '-';
+                        let thuaText = '-';
+                        let gioVaoText = '-';
+                        let gioRaText = '-';
+                        let loaiCaClass = '';
+
+                        // Xử lý theo loại ngày
+                        let loaiCaDisplay = ngay.loaiCa;
+                        
+                        // Nếu có nghỉ phép, note vào loại ca
+                        if (ngay.noteNghiPhep) {
+                            loaiCaDisplay += ` (Off)`;
+                        }
+                        
+                        // Dòng đi làm bình thường
+                        loaiCaClass = (ngay.loaiCa === 'Sáng' || ngay.loaiCa === 'Chiều') ? 'terra-text-warning' : '';
+
+                        gioVaoText = ngay.thoiGianVao ? this.minutesToTime(ngay.thoiGianVao) : '-';
+                        gioRaText = ngay.thoiGianRa ? this.minutesToTime(ngay.thoiGianRa) : '-';
+
+                        // Cột Thừa (overtime)
                         if (ngay.phutThua > 0) {
                             const expectedEndTime = this.calculateExpectedEndTime(ngay.thoiGianVao, ngay.loaiCa);
                             const gioRaChuan = this.minutesToTime(expectedEndTime);
                             const gioRaThucTe = this.minutesToTime(ngay.thoiGianRa);
-                            lamBuText = `<span class="terra-text-success">${ngay.phutThua}</span> (${gioRaChuan}-${gioRaThucTe})`;
+                            thuaText = `<span class="terra-text-success">${ngay.phutThua}</span> (${gioRaChuan} - ${gioRaThucTe})`;
                         }
 
-                        const loaiCaClass = (ngay.loaiCa === 'Sáng' || ngay.loaiCa === 'Chiều') ? 'terra-text-warning' : '';
-
-                        let gioVaoText = ngay.thoiGianVao ? this.minutesToTime(ngay.thoiGianVao) : '-';
-                        let gioRaText = ngay.thoiGianRa ? this.minutesToTime(ngay.thoiGianRa) : '-';
+                        // Cột Làm bù (compensation với khung giờ)
+                        if (ngay.phutLamBu > 0) {
+                            if (ngay.khungGioLamBu) {
+                                lamBuText = `<span class="terra-text-info">${ngay.phutLamBu}</span> (${ngay.khungGioLamBu})`;
+                            } else {
+                                lamBuText = `<span class="terra-text-info">${ngay.phutLamBu}</span>`;
+                            }
+                        }
 
                         if (ngay.thoiGianVao && ngay.thoiGianRa) {
                             const flexRange = this.getFlexibleRange(ngay.loaiCa);
@@ -1038,7 +1246,7 @@ if (window.terraTimeAnalyzerInjected) {
                         }
 
                         const netMinutes = group.totalDeficit - group.totalLamBu;
-                        let netLabel, netClass;
+                        let netLabel = '-', netClass = '';
                         if (netMinutes > 0) {
                             netLabel = `-${netMinutes}p`;
                             netClass = 'terra-week-net-negative';
@@ -1071,10 +1279,11 @@ if (window.terraTimeAnalyzerInjected) {
                         <tr${rowClass ? ` class="${rowClass}"` : ''}>
                             ${weekCell}
                             <td>${ngay.ngay}</td>
-                            <td><small class="${loaiCaClass}">${ngay.loaiCa}</small></td>
+                            <td><small class="${loaiCaClass}">${loaiCaDisplay}</small></td>
                             <td>${gioVaoText}</td>
                             <td>${gioRaText}</td>
                             <td class="${thieuClass}">${ngay.phutThieu || '-'}</td>
+                            <td>${thuaText}</td>
                             <td>${lamBuText}</td>
                         </tr>
                     `;
@@ -1092,12 +1301,13 @@ if (window.terraTimeAnalyzerInjected) {
                         <td>${row.thucTeRa}</td>
                         <td>-</td>
                         <td>-</td>
+                        <td>-</td>
                     </tr>
                 `;
                 });
             }
 
-            const totalNetMinutes = analysis.tongPhutThieu - analysis.tongPhutThua;
+            const totalNetMinutes = analysis.tongPhutThieu - analysis.tongPhutThua - (analysis.tongPhutLamBu || 0);
             let totalNetLabel, totalNetClass;
             if (totalNetMinutes > 0) {
                 totalNetLabel = `-${totalNetMinutes}p`;
@@ -1112,6 +1322,7 @@ if (window.terraTimeAnalyzerInjected) {
                         <td colspan="5"><strong>Tổng <span class="terra-week-net ${totalNetClass}">(${totalNetLabel})</span></strong></td>
                         <td class="terra-text-danger"><strong>${analysis.tongPhutThieu}</strong></td>
                         <td><strong class="terra-text-success">${analysis.tongPhutThua}</strong></td>
+                        <td><strong class="terra-text-info">${analysis.tongPhutLamBu || 0}</strong></td>
                     </tr>
             `;
 

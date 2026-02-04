@@ -53,7 +53,13 @@ class TerraPopup {
             `;
 
             // Inject content script với error handling
-            await this.injectContentScript();
+            try {
+                await this.injectContentScript();
+            } catch (injectError) {
+                console.error('Không thể inject content script:', injectError);
+                this.showError('Không thể kết nối với trang. Vui lòng:<br>1. Tải lại trang<br>2. Mở extension sau khi trang đã load xong');
+                return;
+            }
 
             // Đợi một chút để script khởi tạo
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -61,28 +67,38 @@ class TerraPopup {
             // Kiểm tra bảng Terra với timeout
             const result = await Promise.race([
                 this.sendMessageToContent({ action: 'checkTerraTable' }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
             ]);
-            if (result && result.found) {
-                this.showTerraInterface(result.data);
-            } else if (result && result.error) {
-                // Handle URL validation error from content script
+            
+            if (result && result.error) {
+                // Handle errors from content script or sendMessage
                 this.showError(result.error);
+            } else if (result && result.found) {
+                this.showTerraInterface(result.data);
             } else {
-                this.showError('Lỗi khi quét lại trang');
+                this.showError('Không tìm thấy bảng Terra trên trang này');
             }
         } catch (error) {
-            console.log('Lỗi kiểm tra trang:', error.message);
-            this.showError('Lỗi khi quét lại trang');
+            console.error('Lỗi kiểm tra trang:', error);
+            if (error.message === 'Timeout') {
+                this.showError('Hết thời gian chờ. Vui lòng thử lại.');
+            } else {
+                this.showError('Lỗi khi quét trang. Vui lòng tải lại trang và thử lại.');
+            }
         }
     }
 
     async injectContentScript() {
         try {
+            // Skip if already confirmed injected in this session
+            if (this.contentScriptInjected) {
+                return;
+            }
+            
             // Kiểm tra xem content script đã được inject chưa
             try {
                 const testResult = await Promise.race([
-                    this.sendMessageToContent({ action: 'ping' }),
+                    chrome.tabs.sendMessage(this.currentTab.id, { action: 'ping' }),
                     new Promise((_, reject) => setTimeout(() => reject(new Error('No response')), 1000))
                 ]);
                 
@@ -145,8 +161,21 @@ class TerraPopup {
             const response = await chrome.tabs.sendMessage(this.currentTab.id, message);
             return response;
         } catch (error) {
+            // If content script is not loaded, try to inject it first
+            if (error.message.includes('Receiving end does not exist')) {
+                console.log('Content script chưa load, đang thử inject...');
+                try {
+                    await this.injectContentScript();
+                    // Retry the message
+                    const retryResponse = await chrome.tabs.sendMessage(this.currentTab.id, message);
+                    return retryResponse;
+                } catch (retryError) {
+                    console.error('Không thể kết nối với content script:', retryError.message);
+                    return { error: 'Không thể kết nối với trang. Vui lòng tải lại trang và thử lại.' };
+                }
+            }
             console.error('Lỗi gửi message:', error.message);
-            throw error;
+            return { error: error.message };
         }
     }
 
@@ -261,12 +290,45 @@ class TerraPopup {
         const resultsDiv = document.getElementById('results');
         if (!resultsDiv) return;
 
+        // Tính toán đúng: Net = Thiếu - Thừa - Làm bù
         const shortageMinutes = parseFloat(analysis.phutConThieu) || 0;
         const shortageColor = shortageMinutes > 0 ? '#ff5252' : '#4caf50';
         const shortageIcon = shortageMinutes > 0 ? '⚠️' : '✅';
-        const shortageText = shortageMinutes > 0 ? 'Còn thiếu' : 'Đã đủ/thừa';
-        const shortageValue = Math.abs(shortageMinutes);
-        const shortageUnit = shortageValue >= 60 ? `${(shortageValue/60).toFixed(1)}h` : `${shortageValue}p`;
+        
+        // Tách thành Dự kiến và Thực tế
+        // Dự kiến = overtimeSurplus (thừa - thiếu)
+        // Thực tế (trong ngoặc) = needMoreCompensation (thiếu - làm bù)
+        const overtimeSurplus = (analysis.tongPhutThua || 0) - analysis.tongPhutThieu;
+        const needMoreCompensation = analysis.tongPhutThieu - (analysis.tongPhutLamBu || 0);
+        
+        // Hiển thị Dự kiến
+        const duKienUnit = `${overtimeSurplus}p`;
+        
+        // Hiển thị Thực tế (trong ngoặc)
+        let thucTeUnit = '';
+        if (needMoreCompensation !== 0) {
+            const compensationStyle = needMoreCompensation > 0 ? 'color: #ff5252;' : 'color: #4caf50;';
+            const compensationValue = Math.abs(needMoreCompensation);
+            thucTeUnit = `<span style="${compensationStyle}">${compensationValue}p</span>`;
+        } else {
+            thucTeUnit = '<span style="color: #4caf50;">0p</span>';
+        }
+
+        // Hiển thị thông tin làm bù
+        const lamBuHtml = analysis.tongPhutLamBu > 0 ? `
+            <div class="status-item">
+                <span>Giờ làm bù:</span>
+                <span class="value" style="color: #2196f3;">${analysis.tongPhutLamBu}p</span>
+            </div>
+        ` : '';
+
+        // Hiển thị thông tin nghỉ phép năm
+        const nghiPhepHtml = analysis.soNgayNghiPhep > 0 ? `
+            <div class="status-item">
+                <span>Nghỉ phép</span>
+                <span class="value" style="color: #ff9800;">${analysis.soNgayNghiPhep} ngày</span>
+            </div>
+        ` : '';
 
         resultsDiv.innerHTML = `
             <div class="status">
@@ -274,6 +336,7 @@ class TerraPopup {
                     <span>Ngày làm việc:</span>
                     <span class="value">${analysis.soNgayLamViec} ngày</span>
                 </div>
+                ${nghiPhepHtml}
                 <div class="status-item">
                     <span>Phút thiếu:</span>
                     <span class="value" style="color: #ff5252;">${analysis.tongPhutThieu}p</span>
@@ -282,10 +345,17 @@ class TerraPopup {
                     <span>Phút thừa:</span>
                     <span class="value" style="color: #4caf50;">${analysis.tongPhutThua}p</span>
                 </div>
+                ${lamBuHtml}
                 <div class="status-item" style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 8px; margin-top: 8px;">
-                    <span>${shortageIcon} ${shortageText}:</span>
+                    <span>${shortageIcon} Dự kiến:</span>
                     <span class="value" style="color: ${shortageColor}; font-size: 16px;">
-                        ${shortageUnit}
+                        ${duKienUnit}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>📊 Thực tế:</span>
+                    <span class="value" style="font-size: 16px;">
+                        ${thucTeUnit}
                     </span>
                 </div>
             </div>
