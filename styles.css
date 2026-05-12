@@ -568,6 +568,24 @@
     color: #1565c0 !important;
 }
 
+/* Excluded rows in detail table */
+.terra-row-excluded td:not(.terra-week-cell) {
+    background-color: #ebebeb !important;
+    text-decoration: line-through !important;
+}
+
+.terra-row-excluded td:not(.terra-week-cell),
+.terra-row-excluded td:not(.terra-week-cell) span,
+.terra-row-excluded td:not(.terra-week-cell) small,
+.terra-row-excluded td:not(.terra-week-cell) strong {
+    color: #bbb !important;
+}
+
+.terra-detail-table tbody tr[data-date-key] {
+    cursor: pointer !important;
+    user-select: none !important;
+}
+
 /* Configuration toast messages */
 .terra-config-toast {
     position: fixed !important;

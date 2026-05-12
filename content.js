@@ -83,6 +83,82 @@ if (window.terraTimeAnalyzerInjected) {
     // Load current configuration
     let USER_CONFIG = CONFIG_MANAGER.loadConfig();
 
+    // Manage excluded dates in chrome.storage.local (persisted for ~2 months)
+    const EXCLUDE_MANAGER = {
+        STORAGE_KEY: 'terra_excluded_dates',
+        MAX_AGE_MS: 2 * 30 * 24 * 60 * 60 * 1000,
+
+        _hasExtStorage() {
+            try {
+                return !!(chrome && chrome.storage && chrome.storage.local);
+            } catch (e) {
+                return false;
+            }
+        },
+
+        _lsLoad() {
+            try {
+                return JSON.parse(localStorage.getItem(this.STORAGE_KEY) || '{}');
+            } catch (e) {
+                return {};
+            }
+        },
+
+        _lsSave(data) {
+            try {
+                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {}
+        },
+
+        load() {
+            const self = this;
+            return new Promise((resolve) => {
+                const finish = (stored) => {
+                    const now = Date.now();
+                    const cleaned = {};
+                    for (const [key, val] of Object.entries(stored)) {
+                        if (val && (now - val.excludedAt) < self.MAX_AGE_MS) {
+                            cleaned[key] = val;
+                        }
+                    }
+                    if (Object.keys(cleaned).length !== Object.keys(stored).length) {
+                        self._lsSave(cleaned);
+                        if (self._hasExtStorage()) {
+                            chrome.storage.local.set({ [self.STORAGE_KEY]: cleaned });
+                        }
+                    }
+                    resolve(cleaned);
+                };
+
+                if (self._hasExtStorage()) {
+                    try {
+                        chrome.storage.local.get(self.STORAGE_KEY, (result) => {
+                            finish((result && result[self.STORAGE_KEY]) || {});
+                        });
+                        return;
+                    } catch (e) {}
+                }
+                finish(self._lsLoad());
+            });
+        },
+
+        toggle(dateKey, current) {
+            const updated = { ...current };
+            if (updated[dateKey]) {
+                delete updated[dateKey];
+            } else {
+                updated[dateKey] = { excludedAt: Date.now() };
+            }
+            this._lsSave(updated);
+            if (this._hasExtStorage()) {
+                try {
+                    chrome.storage.local.set({ [this.STORAGE_KEY]: updated });
+                } catch (e) {}
+            }
+            return Promise.resolve(updated);
+        }
+    };
+
     // Constants for shift types and time calculations
     const SHIFT_TYPES = {
         MORNING: 'Sáng',
@@ -206,7 +282,32 @@ if (window.terraTimeAnalyzerInjected) {
             }
 
             const result = await this.performAnalysis();
+            if (result.success && result.analysis.chiTietNgay) {
+                const excludedData = await EXCLUDE_MANAGER.load();
+                const excludedKeys = new Set(Object.keys(excludedData));
+                if (excludedKeys.size > 0) {
+                    result.analysis = this.applyExclusionsToAnalysis(result.analysis, excludedKeys);
+                }
+            }
             sendResponse(result);
+        }
+
+        applyExclusionsToAnalysis(analysis, excludedKeys) {
+            const { deficit, overtime, compensation } = this.computeTotalsExcluding(analysis.chiTietNgay, excludedKeys);
+            const netDeficit = deficit - overtime - compensation;
+            const dailyWorkMinutes = USER_CONFIG.WORK_HOURS.FULL_DAY;
+            const includedDays = analysis.chiTietNgay.filter(d => !excludedKeys.has(this.getDateKey(d.ngay))).length;
+            return {
+                ...analysis,
+                tongPhutThieu: deficit,
+                tongPhutThua: overtime,
+                tongPhutLamBu: compensation,
+                phutConThieu: netDeficit,
+                gioConThieu: (netDeficit / 60).toFixed(2),
+                soNgayLamViec: includedDays,
+                tongGioLamDuKien: (includedDays * dailyWorkMinutes / 60).toFixed(2),
+                tongGioLamThucTe: ((includedDays * dailyWorkMinutes - netDeficit) / 60).toFixed(2),
+            };
         }
 
         async handleShowDetails(sendResponse) {
@@ -845,7 +946,7 @@ if (window.terraTimeAnalyzerInjected) {
                 const match = rowData.gioLamBu.match(/\(\+?([\d.]+)\)/);
                 if (match) {
                     const hours = parseFloat(match[1]);
-                    compensationMinutes = Math.round(hours * 60);
+                    compensationMinutes = Math.min(Math.round(hours * 60), 120);
                     // Tạo khung giờ làm bù từ dự kiến vào/ra (với khoảng trắng)
                     if (rowData.duKienVaoLamBu && rowData.duKienRaLamBu) {
                         compensationTimeRange = `${rowData.duKienVaoLamBu} - ${rowData.duKienRaLamBu}`;
@@ -1157,7 +1258,112 @@ if (window.terraTimeAnalyzerInjected) {
             });
         }
 
-        showDetailedResults(analysis) {
+        getDateKey(dateStr) {
+            const parsed = this.parseDateFromString(dateStr);
+            if (parsed) {
+                const y = parsed.getFullYear();
+                const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                const d = String(parsed.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+            return dateStr;
+        }
+
+        computeTotalsExcluding(chiTietNgay, excludedKeys) {
+            let deficit = 0, overtime = 0, compensation = 0;
+            chiTietNgay.forEach(ngay => {
+                const key = this.getDateKey(ngay.ngay);
+                if (!excludedKeys.has(key)) {
+                    deficit += ngay.phutThieu || 0;
+                    overtime += ngay.phutThua || 0;
+                    compensation += ngay.phutLamBu || 0;
+                }
+            });
+            return { deficit, overtime, compensation };
+        }
+
+        updateWeekCells(weeklyGroups, excludedKeys, tbody) {
+            weeklyGroups.forEach(group => {
+                const cell = tbody.querySelector(`td[data-week-key="${group.key}"]`);
+                if (!cell) return;
+
+                let deficit = 0, lamBu = 0;
+                group.rows.forEach(ngay => {
+                    const key = this.getDateKey(ngay.ngay);
+                    if (!excludedKeys.has(key)) {
+                        deficit += ngay.phutThieu || 0;
+                        lamBu += (ngay.phutThua || 0) + (ngay.phutLamBu || 0);
+                    }
+                });
+
+                const summaryEl = cell.querySelector('.terra-week-summary');
+                if (!summaryEl) return;
+
+                if (deficit === 0 && lamBu === 0) {
+                    summaryEl.style.display = 'none';
+                    return;
+                }
+                summaryEl.style.display = '';
+
+                const netMinutes = deficit - lamBu;
+                let netLabel, netClass;
+                if (netMinutes > 0) {
+                    netLabel = `-${netMinutes}p`;
+                    netClass = 'terra-week-net-negative';
+                } else if (netMinutes < 0) {
+                    netLabel = `+${Math.abs(netMinutes)}p`;
+                    netClass = 'terra-week-net-positive';
+                } else {
+                    netLabel = '0p';
+                    netClass = '';
+                }
+
+                const deficitEl = cell.querySelector('.terra-week-deficit');
+                const surplusEl = cell.querySelector('.terra-week-surplus');
+                const netEl = cell.querySelector('.terra-week-net');
+                if (deficitEl) deficitEl.textContent = `Thiếu: ${deficit}p`;
+                if (surplusEl) surplusEl.textContent = `Dư: ${lamBu}p`;
+                if (netEl) {
+                    netEl.textContent = netLabel;
+                    netEl.className = `terra-week-net ${netClass}`;
+                }
+            });
+        }
+
+        updateDetailTotalRow(chiTietNgay, excludedKeys) {
+            const { deficit, overtime, compensation } = this.computeTotalsExcluding(chiTietNgay, excludedKeys);
+            const netMinutes = deficit - overtime - compensation;
+
+            const elDeficit = document.getElementById('terra-total-deficit-val');
+            const elOvertime = document.getElementById('terra-total-overtime-val');
+            const elCompensation = document.getElementById('terra-total-compensation-val');
+            const elNet = document.getElementById('terra-total-net-label');
+
+            if (elDeficit) elDeficit.textContent = deficit || 0;
+            if (elOvertime) elOvertime.textContent = overtime || 0;
+            if (elCompensation) elCompensation.textContent = compensation || 0;
+            if (elNet) {
+                let netLabel, netClass;
+                if (netMinutes > 0) {
+                    netLabel = `(-${netMinutes}p)`;
+                    netClass = 'terra-week-net-negative';
+                } else if (netMinutes < 0) {
+                    netLabel = `(+${Math.abs(netMinutes)}p)`;
+                    netClass = 'terra-week-net-positive';
+                } else {
+                    netLabel = '(0p)';
+                    netClass = '';
+                }
+                elNet.textContent = netLabel;
+                elNet.className = `terra-week-net ${netClass}`;
+            }
+        }
+
+        async showDetailedResults(analysis) {
+            // Load excluded dates from storage
+            let mutableExcludedData = await EXCLUDE_MANAGER.load();
+            let excludedKeys = new Set(Object.keys(mutableExcludedData));
+
             // Tạo modal chi tiết
             const modal = document.createElement('div');
             modal.className = 'terra-modal-overlay';
@@ -1168,6 +1374,7 @@ if (window.terraTimeAnalyzerInjected) {
             let tableHTML = `
             <div class="terra-modal-header terra-modal-header-with-close">
                 <h2>📋 Chi tiết thời gian làm việc</h2>
+                <p style="margin: 4px 0 0; font-size: 12px; color: #888;">Double-click vào dòng để loại/thêm lại ngày khỏi tổng</p>
                 <button class="terra-close-x" id="terra-close-detail-btn">✕</button>
             </div>
             
@@ -1256,27 +1463,33 @@ if (window.terraTimeAnalyzerInjected) {
                         }
 
                         const weekCell = index === 0
-                            ? `<td class="terra-week-cell" rowspan="${group.rows.length}">
+                            ? `<td class="terra-week-cell" rowspan="${group.rows.length}" data-week-key="${group.key}">
                                     <div class="terra-week-label">${group.label}</div>
-                                    ${(group.totalDeficit === 0 && group.totalLamBu === 0) ? '' : `
-                                    <div class="terra-week-summary">
+                                    <div class="terra-week-summary"${(group.totalDeficit === 0 && group.totalLamBu === 0) ? ' style="display:none"' : ''}>
                                         <div class="terra-week-left">
                                             <span class="terra-week-deficit">Thiếu: ${group.totalDeficit}p</span>
                                             <span class="terra-week-surplus">Dư: ${group.totalLamBu}p</span>
                                         </div>
                                         <div class="terra-week-net-divider"></div>
                                         <div class="terra-week-net ${netClass}">${netLabel}</div>
-                                    </div>`}
+                                    </div>
                                 </td>`
                             : '';
 
                         const isLastWeek = groupIndex === weeklyGroups.length - 1;
-                        const rowClass = index === 0
-                            ? (groupIndex === 0 ? 'terra-week-start-first' : 'terra-week-start-row')
-                            : (index === group.rows.length - 1 && !isLastWeek ? 'terra-week-end-row' : '');
+                        const dateKey = this.getDateKey(ngay.ngay);
+                        const isExcluded = excludedKeys.has(dateKey);
+                        const rowClasses = [];
+                        if (index === 0) {
+                            rowClasses.push(groupIndex === 0 ? 'terra-week-start-first' : 'terra-week-start-row');
+                        } else if (index === group.rows.length - 1 && !isLastWeek) {
+                            rowClasses.push('terra-week-end-row');
+                        }
+                        if (isExcluded) rowClasses.push('terra-row-excluded');
+                        const rowClassAttr = rowClasses.length > 0 ? ` class="${rowClasses.join(' ')}"` : '';
 
                         tableHTML += `
-                        <tr${rowClass ? ` class="${rowClass}"` : ''}>
+                        <tr${rowClassAttr} data-date-key="${dateKey}">
                             ${weekCell}
                             <td>${ngay.ngay}</td>
                             <td><small class="${loaiCaClass}">${loaiCaDisplay}</small></td>
@@ -1319,10 +1532,10 @@ if (window.terraTimeAnalyzerInjected) {
 
             tableHTML += `
                     <tr class="terra-total-row">
-                        <td colspan="5"><strong>Tổng <span class="terra-week-net ${totalNetClass}">(${totalNetLabel})</span></strong></td>
-                        <td class="terra-text-danger"><strong>${analysis.tongPhutThieu}</strong></td>
-                        <td><strong class="terra-text-success">${analysis.tongPhutThua}</strong></td>
-                        <td><strong class="terra-text-info">${analysis.tongPhutLamBu || 0}</strong></td>
+                        <td colspan="5"><strong>Tổng <span id="terra-total-net-label" class="terra-week-net ${totalNetClass}">(${totalNetLabel})</span></strong></td>
+                        <td class="terra-text-danger"><strong id="terra-total-deficit-val">${analysis.tongPhutThieu}</strong></td>
+                        <td><strong id="terra-total-overtime-val" class="terra-text-success">${analysis.tongPhutThua}</strong></td>
+                        <td><strong id="terra-total-compensation-val" class="terra-text-info">${analysis.tongPhutLamBu || 0}</strong></td>
                     </tr>
             `;
 
@@ -1346,6 +1559,37 @@ if (window.terraTimeAnalyzerInjected) {
                     document.body.removeChild(modal);
                 }
             });
+
+            // Cập nhật tổng nếu có ngày đã exclude từ trước
+            if (excludedKeys.size > 0) {
+                const weeklyGroupsForInit = this.groupDetailsByWeek(analysis.chiTietNgay);
+                const initTbody = content.querySelector('.terra-detail-table tbody');
+                if (initTbody) this.updateWeekCells(weeklyGroupsForInit, excludedKeys, initTbody);
+                this.updateDetailTotalRow(analysis.chiTietNgay, excludedKeys);
+            }
+
+            // Double-click để exclude/include một ngày
+            const detailTbody = content.querySelector('.terra-detail-table tbody');
+            const weeklyGroups = this.groupDetailsByWeek(analysis.chiTietNgay);
+            if (detailTbody) {
+                detailTbody.addEventListener('dblclick', async (e) => {
+                    // Bỏ qua click vào terra-week-cell
+                    if (e.target.closest('.terra-week-cell')) return;
+                    const row = e.target.closest('tr[data-date-key]');
+                    if (!row) return;
+                    const dateKey = row.dataset.dateKey;
+                    mutableExcludedData = await EXCLUDE_MANAGER.toggle(dateKey, mutableExcludedData);
+                    excludedKeys = new Set(Object.keys(mutableExcludedData));
+                    // Cập nhật tất cả rows có cùng dateKey
+                    detailTbody.querySelectorAll(`tr[data-date-key="${dateKey}"]`).forEach(r => {
+                        r.classList.toggle('terra-row-excluded', excludedKeys.has(dateKey));
+                    });
+                    // Cập nhật week cell summary
+                    this.updateWeekCells(weeklyGroups, excludedKeys, detailTbody);
+                    // Cập nhật dòng tổng
+                    this.updateDetailTotalRow(analysis.chiTietNgay, excludedKeys);
+                });
+            }
         }
 
         showConfigModal() {
